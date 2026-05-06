@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "llm-worker-tools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "--yes",
+        "llm-worker-tools",
+        "mcp"
+      ],
+      "env": {
+        "LLM_WORKER_ENV_PATH": "C:/Users/you/.llm-worker-tools/.env"
+      }
+    }
+  }
+}

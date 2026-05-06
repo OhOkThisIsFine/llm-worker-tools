@@ -1,0 +1,50 @@
+{
+  "name": "llm-worker-tools",
+  "version": "0.2.0",
+  "description": "Ambient LLM worker tools for coding agents across Codex, Claude Desktop, VS Code, and OpenCode.",
+  "type": "module",
+  "private": false,
+  "bin": {
+    "llm": "./llm-worker.mjs",
+    "llm-worker-tools": "./bin/llm-worker-tools.mjs"
+  },
+  "scripts": {
+    "setup:ides": "npm install && node scripts/install-ides.mjs --use-local-paths",
+    "install:ides": "node scripts/install-ides.mjs --use-local-paths",
+    "sync:ides": "node scripts/sync-host-files.mjs",
+    "check:ides": "node scripts/sync-host-files.mjs --check",
+    "test": "npm run check:ides && npm run smoke:codex-plugin",
+    "smoke:codex-plugin": "node scripts/validate-plugin.mjs"
+  },
+  "files": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "CLAUDE-SNIPPET.md",
+    "README.md",
+    "bin/",
+    "scripts/",
+    "shared/",
+    "skills/",
+    ".codex-plugin/",
+    ".github/copilot-instructions.md",
+    ".opencode/",
+    ".vscode/",
+    "claude-desktop-config.example.json",
+    "llm-worker.mjs"
+  ],
+  "engines": {
+    "node": ">=22.14.0",
+    "npm": ">=11.5.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OhOkThisIsFine/llm-worker-tools.git"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "openai": "^4.104.0"
+  }
+}

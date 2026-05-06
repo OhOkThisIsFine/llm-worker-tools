@@ -1,0 +1,4 @@
+node_modules/
+.env
+.llm-worker-input.txt
+*.log

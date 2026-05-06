@@ -1,0 +1,39 @@
+{
+  "name": "llm-worker-tools",
+  "version": "0.2.0",
+  "description": "Codex plugin wrapper for a backend-neutral LLM worker CLI. Codex should use it proactively when normal code work involves large files, broad context reduction, multi-file summarization, or repetitive scaffolding that benefits from an advisory worker model.",
+  "author": {
+    "name": "Ethan"
+  },
+  "homepage": "https://github.com/",
+  "repository": "https://github.com/",
+  "license": "UNLICENSED",
+  "keywords": [
+    "llm",
+    "worker",
+    "code-analysis",
+    "codex",
+    "local-backend"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "LLM Worker Tools",
+    "shortDescription": "Offload bulky code context to a configured LLM backend",
+    "longDescription": "LLM Worker Tools gives Codex a repeatable way to call a local or OpenAI-compatible backend for large codebase reading and repetitive draft generation. It is intended for proactive use during ordinary coding tasks when the agent needs to reduce bulky context or draft mechanical code. Outputs are advisory JSON that Codex must verify against the source before using.",
+    "developerName": "Ethan",
+    "category": "Engineering",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/",
+    "privacyPolicyURL": "https://openai.com/policies/row-privacy-policy/",
+    "termsOfServiceURL": "https://openai.com/policies/row-terms-of-use/",
+    "defaultPrompt": [
+      "Summarize a large file with the worker.",
+      "Draft repetitive scaffolding with the worker."
+    ],
+    "brandColor": "#2563EB",
+    "screenshots": []
+  }
+}

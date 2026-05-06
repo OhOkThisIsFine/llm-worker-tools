@@ -1,0 +1,5 @@
+interface:
+  display_name: "LLM Worker"
+  short_description: "Offload large code context to a configured LLM backend"
+  brand_color: "#2563EB"
+  default_prompt: "Use LLM Worker to summarize this large file and verify the result against source."
