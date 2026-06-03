@@ -32,6 +32,10 @@ Prefer `read` for summarizing large files, extracting likely areas of interest, 
 
 Prefer `write` only for repetitive scaffolding where the desired behavior is already clear. Review and edit generated files manually; never apply worker output blindly.
 
+## Limitations
+
+Each `llm-worker-tools read` and `llm-worker-tools write` invocation is stateless and single-call only. The worker receives only the current request input, has no session continuity or memory of prior calls, and iterative workflows must include any prior summaries, excerpts, or comparison context in the next input. This is intentional composability behavior, not a bug.
+
 Heuristics:
 
 - Use `read` when a file is roughly 400+ lines, generated-looking, minified, or dense enough that a summary would speed up local verification.

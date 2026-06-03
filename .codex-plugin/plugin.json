@@ -5,8 +5,8 @@
   "author": {
     "name": "Ethan"
   },
-  "homepage": "https://github.com/",
-  "repository": "https://github.com/",
+  "homepage": "https://github.com/OhOkThisIsFine/llm-worker-tools",
+  "repository": "https://github.com/OhOkThisIsFine/llm-worker-tools",
   "license": "UNLICENSED",
   "keywords": [
     "llm",
@@ -26,9 +26,7 @@
       "Read",
       "Write"
     ],
-    "websiteURL": "https://github.com/",
-    "privacyPolicyURL": "https://openai.com/policies/row-privacy-policy/",
-    "termsOfServiceURL": "https://openai.com/policies/row-terms-of-use/",
+    "websiteURL": "https://github.com/OhOkThisIsFine/llm-worker-tools",
     "defaultPrompt": [
       "Summarize a large file with the worker.",
       "Draft repetitive scaffolding with the worker."

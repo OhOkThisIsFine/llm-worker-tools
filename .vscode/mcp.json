@@ -7,10 +7,7 @@
         "--yes",
         "llm-worker-tools",
         "mcp"
-      ],
-      "env": {
-        "LLM_WORKER_ENV_PATH": "${env:LLM_WORKER_ENV_PATH}"
-      }
+      ]
     }
   }
 }

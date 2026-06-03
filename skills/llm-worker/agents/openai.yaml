@@ -1,3 +1,4 @@
+name: "llm-worker"
 interface:
   display_name: "LLM Worker"
   short_description: "Offload large code context to a configured LLM backend"

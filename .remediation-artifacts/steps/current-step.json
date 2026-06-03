@@ -1,0 +1,15 @@
+{
+  "contract_version": "remediate-code-step/v1alpha1",
+  "step_kind": "present_report",
+  "status": "complete",
+  "prompt_path": "C:\\Code\\llm-worker-tools\\.remediation-artifacts\\steps\\current-prompt.md",
+  "run_id": "PLAN-mpxly8hr-1a2n66",
+  "repo_root": "C:\\Code\\llm-worker-tools",
+  "artifacts_dir": "C:\\Code\\llm-worker-tools\\.remediation-artifacts",
+  "allowed_commands": [],
+  "stop_condition": "Stop after presenting the remediation report summary.",
+  "artifact_paths": {
+    "current_prompt": "C:\\Code\\llm-worker-tools\\.remediation-artifacts\\steps\\current-prompt.md",
+    "final_report": "C:\\Code\\llm-worker-tools\\remediation-report.md"
+  }
+}

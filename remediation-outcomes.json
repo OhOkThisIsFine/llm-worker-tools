@@ -1,0 +1,644 @@
+{
+  "contract_version": "remediate-code-outcomes/v1alpha1",
+  "total": 59,
+  "by_outcome": {
+    "resolved": 44,
+    "verified_no_change": 10,
+    "inappropriate": 1,
+    "ignored": 4,
+    "blocked": 0
+  },
+  "by_lens": {
+    "config_deployment": {
+      "resolved": 4
+    },
+    "correctness": {
+      "resolved": 11,
+      "verified_no_change": 2
+    },
+    "architecture": {
+      "resolved": 7,
+      "verified_no_change": 5,
+      "inappropriate": 1,
+      "ignored": 4
+    },
+    "reliability": {
+      "resolved": 5
+    },
+    "tests": {
+      "resolved": 4
+    },
+    "observability": {
+      "resolved": 4,
+      "verified_no_change": 1
+    },
+    "performance": {
+      "resolved": 2
+    },
+    "operability": {
+      "resolved": 3
+    },
+    "maintainability": {
+      "resolved": 4,
+      "verified_no_change": 2
+    }
+  },
+  "outcomes": [
+    {
+      "finding_id": "FINDING-001",
+      "lens": "config_deployment",
+      "file_exts": [
+        ".yml"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-002",
+      "lens": "config_deployment",
+      "file_exts": [
+        ".yml"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-003",
+      "lens": "correctness",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-004",
+      "lens": "architecture",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-005",
+      "lens": "architecture",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "verified_no_change",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-006",
+      "lens": "reliability",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-007",
+      "lens": "tests",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-008",
+      "lens": "config_deployment",
+      "file_exts": [
+        ".yml"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-009",
+      "lens": "correctness",
+      "file_exts": [
+        ".json"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-010",
+      "lens": "reliability",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-011",
+      "lens": "correctness",
+      "file_exts": [
+        ".json"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-012",
+      "lens": "tests",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-013",
+      "lens": "correctness",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-014",
+      "lens": "architecture",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "verified_no_change",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-015",
+      "lens": "architecture",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "verified_no_change",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-016",
+      "lens": "architecture",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "verified_no_change",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-017",
+      "lens": "observability",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-018",
+      "lens": "architecture",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-019",
+      "lens": "performance",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-020",
+      "lens": "architecture",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "inappropriate",
+      "rework_count": 2,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-021",
+      "lens": "architecture",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "ignored",
+      "rework_count": 2,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-022",
+      "lens": "operability",
+      "file_exts": [
+        ".yml"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-023",
+      "lens": "tests",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-024",
+      "lens": "tests",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-025",
+      "lens": "architecture",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-026",
+      "lens": "maintainability",
+      "file_exts": [
+        ".json"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-027",
+      "lens": "architecture",
+      "file_exts": [
+        ".mjs",
+        ".ps1",
+        ".yaml"
+      ],
+      "outcome": "ignored",
+      "rework_count": 2,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-028",
+      "lens": "correctness",
+      "file_exts": [
+        ".json"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-029",
+      "lens": "correctness",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-030",
+      "lens": "config_deployment",
+      "file_exts": [
+        ".yml"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-031",
+      "lens": "reliability",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-032",
+      "lens": "reliability",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-033",
+      "lens": "correctness",
+      "file_exts": [
+        ".toml"
+      ],
+      "outcome": "verified_no_change",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-034",
+      "lens": "correctness",
+      "file_exts": [
+        ".yaml"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-035",
+      "lens": "reliability",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-036",
+      "lens": "observability",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-037",
+      "lens": "maintainability",
+      "file_exts": [
+        ".toml"
+      ],
+      "outcome": "verified_no_change",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-038",
+      "lens": "architecture",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "ignored",
+      "rework_count": 2,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-039",
+      "lens": "architecture",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-040",
+      "lens": "operability",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-041",
+      "lens": "operability",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-042",
+      "lens": "maintainability",
+      "file_exts": [
+        ".toml"
+      ],
+      "outcome": "verified_no_change",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-043",
+      "lens": "architecture",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-044",
+      "lens": "maintainability",
+      "file_exts": [
+        ".json"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-045",
+      "lens": "observability",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-046",
+      "lens": "performance",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-047",
+      "lens": "architecture",
+      "file_exts": [
+        ".md"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-048",
+      "lens": "maintainability",
+      "file_exts": [
+        ".json"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-049",
+      "lens": "observability",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-050",
+      "lens": "maintainability",
+      "file_exts": [
+        ".json"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-051",
+      "lens": "architecture",
+      "file_exts": [
+        ".json"
+      ],
+      "outcome": "verified_no_change",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-052",
+      "lens": "observability",
+      "file_exts": [
+        ".toml"
+      ],
+      "outcome": "verified_no_change",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-053",
+      "lens": "architecture",
+      "file_exts": [
+        ".json",
+        ".md",
+        ".mjs"
+      ],
+      "outcome": "ignored",
+      "rework_count": 2,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-054",
+      "lens": "correctness",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-055",
+      "lens": "architecture",
+      "file_exts": [
+        ".md",
+        ".mjs",
+        ".ps1"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-056",
+      "lens": "correctness",
+      "file_exts": [
+        ".toml"
+      ],
+      "outcome": "verified_no_change",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-057",
+      "lens": "correctness",
+      "file_exts": [
+        ".json"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-058",
+      "lens": "correctness",
+      "file_exts": [
+        ".mjs"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    },
+    {
+      "finding_id": "FINDING-059",
+      "lens": "correctness",
+      "file_exts": [
+        ".json"
+      ],
+      "outcome": "resolved",
+      "rework_count": 0,
+      "closing_status": "skipped"
+    }
+  ]
+}
