@@ -369,4 +369,9 @@ async function main() {
   }
 }
 
-await main();
+// Only run the CLI when this file is the entry point, not when imported as a library.
+const __isMain = process.argv[1] && (
+  import.meta.url === new URL(process.argv[1], import.meta.url).href ||
+  import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"))
+);
+if (__isMain) await main();
