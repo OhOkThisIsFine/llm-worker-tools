@@ -3,8 +3,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-const root = process.cwd();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(__dirname, "..");
 const requiredFiles = [
   ".codex-plugin/plugin.json",
   ".github/copilot-instructions.md",
@@ -55,7 +57,7 @@ if (manifest.skills !== "./skills/") {
   fail(`plugin.json skills must be ./skills/, got ${manifest.skills}`);
 }
 
-const skillText = fs.readFileSync(path.join(root, "skills/llm-worker/SKILL.md"), "utf8");
+const skillText = fs.readFileSync(path.join(root, "skills/llm-worker/SKILL.md"), "utf8").replace(/\r\n/g, "\n");
 if (!skillText.startsWith("---\n")) {
   fail("SKILL.md must start with YAML frontmatter.");
 }
