@@ -1,13 +1,26 @@
 #!/usr/bin/env node
 
-import { spawn } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import process from "node:process";
+import OpenAI from "openai";
+import { runWorker, showModels } from "../llm-worker.mjs";
 import { loadUserEnv } from "./env-utils.mjs";
 
 loadUserEnv();
 
-const workerPath = fileURLToPath(new URL("../llm-worker.mjs", import.meta.url));
+const { version } = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8")
+);
+
+const BASE_URL = process.env.LLM_BACKEND_BASE_URL;
+const API_KEY = process.env.LLM_BACKEND_API_KEY || "local-backend";
+
+const client = BASE_URL
+  ? new OpenAI({ apiKey: API_KEY, baseURL: BASE_URL })
+  : null;
+
+const MAX_INPUT_BYTES = 1_048_576;
+
 let inputBuffer = Buffer.alloc(0);
 
 const tools = [
@@ -87,41 +100,34 @@ function parseMessages() {
   }
 }
 
-function runWorker(args, input) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [workerPath, ...args], {
-      env: process.env,
-      stdio: ["pipe", "pipe", "pipe"]
-    });
-
-    let stdout = "";
-    let stderr = "";
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", chunk => { stdout += chunk; });
-    child.stderr.on("data", chunk => { stderr += chunk; });
-    child.on("error", reject);
-    child.on("close", code => {
-      if (code === 0) resolve(stdout.trim());
-      else reject(new Error((stderr || stdout || `Worker exited with code ${code}`).trim()));
-    });
-    child.stdin.end(input || "");
-  });
-}
-
 async function callTool(name, args = {}) {
   if (name === "llm_worker_models") {
-    const output = await runWorker(["models", ...(args.refresh ? ["--refresh"] : [])], "");
-    return output;
+    const controller = new AbortController();
+    let output = "";
+    const origLog = console.log;
+    console.log = (...parts) => { output += parts.join(" ") + "\n"; };
+    try {
+      await showModels(args.refresh || false);
+    } finally {
+      console.log = origLog;
+    }
+    return output.trim();
   }
 
   if (name === "llm_worker_read" || name === "llm_worker_write") {
     if (typeof args.input !== "string" || !args.input.trim()) {
       throw new Error("Tool argument input must be a non-empty string.");
     }
+    if (Buffer.byteLength(args.input, "utf8") > MAX_INPUT_BYTES) {
+      throw new Error(`Input exceeds maximum allowed size of ${MAX_INPUT_BYTES} bytes.`);
+    }
     const verb = name === "llm_worker_read" ? "read" : "write";
-    const workerArgs = [verb, ...(args.model ? ["--model", args.model] : [])];
-    return await runWorker(workerArgs, args.input);
+    const controller = new AbortController();
+    return await runWorker(
+      verb,
+      { input: args.input, modelOverride: args.model || null, signal: controller.signal },
+      client
+    );
   }
 
   throw new Error(`Unknown tool: ${name}`);
@@ -135,7 +141,7 @@ async function handleMessage(message) {
       result: {
         protocolVersion: message.params?.protocolVersion || "2024-11-05",
         capabilities: { tools: {} },
-        serverInfo: { name: "llm-worker-tools", version: "0.2.0" }
+        serverInfo: { name: "llm-worker-tools", version }
       }
     });
     return;
@@ -163,6 +169,11 @@ async function handleMessage(message) {
         result: { isError: true, content: [{ type: "text", text: error.message }] }
       });
     }
+    return;
+  }
+
+  if (message.method && message.method.startsWith("notifications/")) {
+    // notification — no id to reply to; log errors to stderr
     return;
   }
 

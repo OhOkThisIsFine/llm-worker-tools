@@ -40,6 +40,7 @@ if (!scriptByCommand.has(command)) {
 }
 
 const script = path.join(packageRoot, scriptByCommand.get(command));
+// install/setup/mcp strip the command word (args.slice(1)) because their scripts parse only flags; read/write/models forward full args because llm-worker.mjs expects the verb as argv[2].
 const childArgs = ["install", "setup", "mcp"].includes(command) ? args.slice(1) : args;
 
 const child = spawn(process.execPath, [script, ...childArgs], {

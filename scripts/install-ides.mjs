@@ -136,7 +136,7 @@ async function promptForConfig() {
   loadUserEnv(envPath);
   const existingBaseUrl = process.env.LLM_BACKEND_BASE_URL || "";
   const existingApiKey = process.env.LLM_BACKEND_API_KEY || "";
-  const existingCachePath = process.env.LLM_MODEL_CACHE_PATH || "C:/tmp/llm-worker/models.json";
+  const existingCachePath = process.env.LLM_MODEL_CACHE_PATH || path.join(process.env.USERPROFILE || os.homedir(), ".cache", "llm-worker", "models.json");
 
   if (nonInteractive) {
     if (!existingBaseUrl) {
@@ -190,12 +190,8 @@ function installClaudeDesktop() {
 
   const instructionPath = path.join(home, ".claude", "CLAUDE.md");
   const existing = fs.existsSync(instructionPath) ? fs.readFileSync(instructionPath, "utf8") : "";
-  const includeLine = [
-    "",
-    "# LLM Worker Tools",
-    "Use LLM Worker Tools as an ambient coding helper. Prefer the `llm-worker-tools` MCP tools for bulky code context reduction, and verify all worker output against source before acting.",
-    "",
-  ].join("\n");
+  const packageClaudeMd = fs.readFileSync(path.resolve(path.dirname(new URL(import.meta.url).pathname), "../CLAUDE.md"), "utf8");
+  const includeLine = `\n# LLM Worker Tools\n${packageClaudeMd.trim()}\n`;
   if (!existing.includes("LLM Worker Tools")) {
     writeText(instructionPath, `${existing.trim()}\n${includeLine}`);
   } else {

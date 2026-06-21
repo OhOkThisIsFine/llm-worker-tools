@@ -71,7 +71,12 @@ Return ONLY the model ID string. No explanation, no markdown, no quotes.`;
 
 // ── Utilities ───────────────────────────────────────────────────────
 
-function die(msg, code = 1) { console.error(msg); process.exit(code); }
+// client !== null means library mode: throw instead of process.exit
+function die(msg, code = 1, client = null) {
+  if (client !== null) throw new Error(msg);
+  console.error(msg);
+  process.exit(code);
+}
 
 function is404(err) {
   return err?.status === 404 ||
@@ -82,8 +87,8 @@ function isUnsupportedModel(err) {
   return [400, 404, 422].includes(err?.status);
 }
 
-function assertConfig() {
-  if (!BASE_URL) die("Missing LLM_BACKEND_BASE_URL.");
+function assertConfig(client = null) {
+  if (!BASE_URL) die("Missing LLM_BACKEND_BASE_URL.", 1, client);
 }
 
 function stripFences(text) {
@@ -110,17 +115,21 @@ function readInput(inputPath) {
 }
 
 function setsEqual(a, b) {
-  if (a.length !== b.length) return false;
+  const setA = new Set(a);
   const setB = new Set(b);
-  return a.every(item => setB.has(item));
+  if (setA.size !== setB.size) return false;
+  for (const item of setA) {
+    if (!setB.has(item)) return false;
+  }
+  return true;
 }
 
-function parseWorkerJson(text, verb) {
+function parseWorkerJson(text, verb, client = null) {
   let parsed;
   try {
     parsed = JSON.parse(stripFences(text));
   } catch (err) {
-    die(`Backend returned invalid JSON for ${verb}: ${err.message}`);
+    die(`Backend returned invalid JSON for ${verb}: ${err.message}`, 1, client);
   }
 
   if (verb === "read") {
@@ -130,7 +139,7 @@ function parseWorkerJson(text, verb) {
       parsed.findings.every(item => typeof item === "string") &&
       Array.isArray(parsed.open_questions) &&
       parsed.open_questions.every(item => typeof item === "string");
-    if (!valid) die("Backend JSON did not match read schema.");
+    if (!valid) die("Backend JSON did not match read schema.", 1, client);
   }
 
   if (verb === "write") {
@@ -139,7 +148,7 @@ function parseWorkerJson(text, verb) {
       parsed.files.every(file => file && typeof file.path === "string" && typeof file.content === "string") &&
       Array.isArray(parsed.notes) &&
       parsed.notes.every(item => typeof item === "string");
-    if (!valid) die("Backend JSON did not match write schema.");
+    if (!valid) die("Backend JSON did not match write schema.", 1, client);
   }
 
   return JSON.stringify(parsed, null, 2);
@@ -168,7 +177,7 @@ async function fetchModelList(client) {
   return response.data.map(m => m.id).filter(Boolean).sort();
 }
 
-async function selectBestModel(client, models) {
+async function selectBestModel(client, models, signal) {
   const prompt = MODEL_SELECTION_PROMPT.replace("{MODEL_LIST}", models.join("\n"));
 
   for (const bootstrap of models) {
@@ -179,7 +188,7 @@ async function selectBestModel(client, models) {
         temperature: 0,
         max_tokens: 100,
         messages: [{ role: "user", content: prompt }],
-      });
+      }, { signal });
     } catch (err) {
       if (isUnsupportedModel(err)) {
         console.error(`Bootstrap "${bootstrap}" unavailable (${err.status || "unsupported"}), trying next...`);
@@ -201,7 +210,7 @@ async function selectBestModel(client, models) {
   die("No models responded to the selection prompt. Check your API key and account access.");
 }
 
-async function refreshCache(client, force = false) {
+async function refreshCache(client, force = false, signal) {
   const models = await fetchModelList(client);
   const existing = readCache();
 
@@ -212,27 +221,27 @@ async function refreshCache(client, force = false) {
   }
 
   console.error("Model list changed. Selecting best model...");
-  const selected = await selectBestModel(client, models);
+  const selected = await selectBestModel(client, models, signal);
   const cache = { fetched_at: new Date().toISOString(), base_url: BASE_URL, models, selected_model: selected };
   writeCache(cache);
   console.error(`Selected: ${selected}`);
   return cache;
 }
 
-async function resolveModel(client) {
+async function resolveModel(client, signal) {
   const existing = readCache();
   if (cacheIsFresh(existing)) return existing.selected_model;
-  const cache = await refreshCache(client);
+  const cache = await refreshCache(client, false, signal);
   return cache.selected_model;
 }
 
-async function nextModel(client, tried) {
+async function nextModel(client, tried, signal) {
   let existing = readCache();
   let candidates = (existing?.models || []).filter(m => !tried.has(m));
 
   if (candidates.length === 0) {
     console.error("All cached models exhausted. Refreshing model list...");
-    existing = await refreshCache(client, true);
+    existing = await refreshCache(client, true, signal);
     candidates = existing.models.filter(m => !tried.has(m));
     if (candidates.length === 0) {
       die("All available models returned 404. Check your API key and account access.");
@@ -240,7 +249,7 @@ async function nextModel(client, tried) {
   }
 
   console.error(`Selecting from ${candidates.length} remaining model(s)...`);
-  const selected = await selectBestModel(client, candidates);
+  const selected = await selectBestModel(client, candidates, signal);
   writeCache({ ...existing, selected_model: selected });
   console.error(`Now using: ${selected}`);
   return selected;
@@ -248,51 +257,61 @@ async function nextModel(client, tried) {
 
 // ── Commands ────────────────────────────────────────────────────────
 
-async function runWorker(verb, { modelOverride, inputPath }) {
-  assertConfig();
-  const input = readInput(inputPath);
-  if (!input) die(inputPath ? `Empty input file: ${inputPath}` : "Empty stdin.");
+export async function runWorker(verb, { modelOverride, inputPath, input, signal } = {}, client = null) {
+  assertConfig(client);
 
-  const client = new OpenAI({ apiKey: API_KEY, baseURL: BASE_URL });
-  let model = modelOverride || await resolveModel(client);
+  // Resolve input: inline string > inputPath > stdin/env
+  let resolvedInput;
+  if (typeof input === "string" && input.trim()) {
+    resolvedInput = input.trim();
+  } else {
+    resolvedInput = readInput(inputPath);
+    if (!resolvedInput) die(inputPath ? `Empty input file: ${inputPath}` : "Empty stdin.", 1, client);
+  }
+
+  const ownClient = client === null;
+  const resolvedClient = ownClient ? new OpenAI({ apiKey: API_KEY, baseURL: BASE_URL }) : client;
+  let model = modelOverride || await resolveModel(resolvedClient, signal);
   const tried = new Set();
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const effectiveSignal = signal || controller.signal;
+  const timer = ownClient ? setTimeout(() => controller.abort(), TIMEOUT_MS) : null;
 
   try {
     for (;;) {
       tried.add(model);
       try {
-        const response = await client.chat.completions.create({
+        const response = await resolvedClient.chat.completions.create({
           model,
           temperature: TEMPS[verb],
           max_tokens: MAX_TOKENS[verb],
           messages: [
             { role: "system", content: SYSTEM[verb] },
-            { role: "user",   content: input },
+            { role: "user",   content: resolvedInput },
           ],
-        }, { signal: controller.signal });
+        }, { signal: effectiveSignal });
 
         const content = response.choices?.[0]?.message?.content;
-        if (!content) die("Backend returned no content.");
-        console.log(parseWorkerJson(content, verb));
-        return;
+        if (!content) die("Backend returned no content.", 1, client);
+        const result = parseWorkerJson(content, verb, client);
+        if (ownClient) console.log(result);
+        return result;
       } catch (err) {
         if (!modelOverride && is404(err)) {
           console.error(`Model "${model}" returned 404.`);
-          model = await nextModel(client, tried);
+          model = await nextModel(resolvedClient, tried, effectiveSignal);
           continue;
         }
         throw err;
       }
     }
   } finally {
-    clearTimeout(timer);
+    if (timer !== null) clearTimeout(timer);
   }
 }
 
-async function showModels(forceRefresh) {
+export async function showModels(forceRefresh) {
   assertConfig();
   const client = new OpenAI({ apiKey: API_KEY, baseURL: BASE_URL });
   const existing = readCache();
@@ -350,4 +369,9 @@ async function main() {
   }
 }
 
-await main();
+// Only run the CLI when this file is the entry point, not when imported as a library.
+const __isMain = process.argv[1] && (
+  import.meta.url === new URL(process.argv[1], import.meta.url).href ||
+  import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"))
+);
+if (__isMain) await main();
