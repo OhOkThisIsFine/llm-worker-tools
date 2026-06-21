@@ -153,10 +153,7 @@ writeGenerated(".vscode/mcp.json", JSON.stringify({
     "llm-worker-tools": {
       type: "stdio",
       command: "npx",
-      args: ["--yes", "llm-worker-tools", "mcp"],
-      env: {
-        LLM_WORKER_ENV_PATH: "${env:LLM_WORKER_ENV_PATH}"
-      }
+      args: ["--yes", "llm-worker-tools", "mcp"]
     }
   }
 }, null, 2));

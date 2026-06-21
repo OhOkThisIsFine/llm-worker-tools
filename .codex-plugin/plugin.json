@@ -27,8 +27,6 @@
       "Write"
     ],
     "websiteURL": "https://github.com/OhOkThisIsFine/llm-worker-tools",
-    "privacyPolicyURL": "https://openai.com/policies/row-privacy-policy/",
-    "termsOfServiceURL": "https://openai.com/policies/row-terms-of-use/",
     "defaultPrompt": [
       "Summarize a large file with the worker.",
       "Draft repetitive scaffolding with the worker."

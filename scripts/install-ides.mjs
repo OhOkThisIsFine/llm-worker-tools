@@ -173,12 +173,14 @@ async function promptForConfig() {
 
 function installEnv(values) {
   writeText(envPath, formatEnv(values), 0o600);
+  return dryRun ? "would modify" : "modified";
 }
 
 function installCodexSkill() {
   const target = path.join(home, ".codex", "skills", "llm-worker");
   const source = path.join(root, "skills", "llm-worker");
   copyDir(source, target);
+  return dryRun ? "would modify" : "modified";
 }
 
 function installClaudeDesktop() {
@@ -190,12 +192,17 @@ function installClaudeDesktop() {
 
   const instructionPath = path.join(home, ".claude", "CLAUDE.md");
   const existing = fs.existsSync(instructionPath) ? fs.readFileSync(instructionPath, "utf8") : "";
-  const packageClaudeMd = fs.readFileSync(path.resolve(path.dirname(new URL(import.meta.url).pathname), "../CLAUDE.md"), "utf8");
-  const includeLine = `\n# LLM Worker Tools\n${packageClaudeMd.trim()}\n`;
+  const section = [
+    "# LLM Worker Tools",
+    "Use LLM Worker Tools as an ambient coding helper. Prefer the `llm-worker-tools` MCP tools for bulky code context reduction, and verify all worker output against source before acting.",
+  ].join("\n");
   if (!existing.includes("LLM Worker Tools")) {
-    writeText(instructionPath, `${existing.trim()}\n${includeLine}`);
+    const trimmedExisting = existing.trim();
+    writeText(instructionPath, trimmedExisting ? `${trimmedExisting}\n\n${section}` : section);
+    return dryRun ? "would modify" : "modified";
   } else {
     log(`Claude instructions already mention LLM Worker Tools at ${instructionPath}`);
+    return "already up-to-date";
   }
 }
 
@@ -205,6 +212,7 @@ function installVSCode() {
   config.servers = config.servers || {};
   config.servers["llm-worker-tools"] = mcpServerForVSCode();
   writeJson(userMcpPath, config);
+  return dryRun ? "would modify" : "modified";
 }
 
 function installOpenCode() {
@@ -231,28 +239,54 @@ function installOpenCode() {
     },
   };
   writeJson(configPath, config);
+  return dryRun ? "would modify" : "modified";
 }
 
 function installSharedInstructions() {
-  writeText(path.join(defaultConfigDir(), "AGENTS.md"), fs.readFileSync(path.join(root, "AGENTS.md"), "utf8"));
+  const target = path.join(defaultConfigDir(), "AGENTS.md");
+  const canonical = fs.readFileSync(path.join(root, "AGENTS.md"), "utf8").trim();
+  if (!fs.existsSync(target)) {
+    writeText(target, canonical);
+    return dryRun ? "would modify" : "modified";
+  }
+
+  const existing = fs.readFileSync(target, "utf8");
+  if (existing.trim() === canonical || existing.includes(canonical)) {
+    log(`shared instructions already current at ${target}`);
+    return "already up-to-date";
+  }
+
+  const delimiterStart = "<!-- BEGIN LLM Worker Tools managed instructions -->";
+  const delimiterEnd = "<!-- END LLM Worker Tools managed instructions -->";
+  const managedBlock = `${delimiterStart}\n${canonical}\n${delimiterEnd}`;
+  const withoutOldBlock = existing.replace(
+    new RegExp(`\\n?${delimiterStart}[\\s\\S]*?${delimiterEnd}\\n?`, "m"),
+    "\n"
+  ).trim();
+  writeText(target, `${withoutOldBlock}\n\n${managedBlock}`);
+  return dryRun ? "would modify" : "modified";
 }
 
 try {
   runNodeScript("scripts/sync-host-files.mjs", dryRun ? ["--check"] : []);
   const values = await promptForConfig();
-  installEnv(values);
-  installSharedInstructions();
-  installCodexSkill();
-  installClaudeDesktop();
-  installVSCode();
-  installOpenCode();
+  const outcomes = [
+    ["Environment", installEnv(values)],
+    ["Shared instructions", installSharedInstructions()],
+    ["Codex skill", installCodexSkill()],
+    ["Claude Desktop", installClaudeDesktop()],
+    ["VS Code", installVSCode()],
+    ["OpenCode", installOpenCode()],
+  ];
 
   console.log("");
   console.log("LLM Worker Tools IDE install complete.");
+  for (const [name, outcome] of outcomes) {
+    console.log(`- ${name}: ${outcome}`);
+  }
   console.log(`Credentials were written only to ${envPath}.`);
   console.log("IDE configs reference that file path but do not contain the API key.");
 } catch (error) {
   console.error(error?.stack || error?.message || String(error));
   process.exit(1);
 }
-

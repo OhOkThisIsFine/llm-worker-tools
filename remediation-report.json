@@ -1,0 +1,308 @@
+{
+  "resolved": [
+    {
+      "finding_id": "FINDING-001",
+      "summary": "CFG-002: Action tags are mutable floating labels, not pinned commit SHAs",
+      "verification_evidence": ".github/workflows/publish.yml now uses full 40-character action commit SHAs for actions/checkout and actions/setup-node instead of floating action tags.\nVerified official GitHub refs with git ls-remote: actions/checkout v6.0.3 peels to df4cb1c069e1874edd31b4311f1884172cec0e10; actions/setup-node v6.4.0 resolves to 48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e.\nRan workflow text checks confirming both action uses entries are pinned to 40-character hexadecimal SHAs."
+    },
+    {
+      "finding_id": "FINDING-002",
+      "summary": "CFG-001: actions/checkout@v6 and actions/setup-node@v6 do not exist",
+      "verification_evidence": ".github/workflows/publish.yml no longer references actions/checkout@v6 or actions/setup-node@v6, so it avoids runtime resolution through mutable major tags.\nCurrent official GitHub refs show v6 releases exist; the workflow pins the corresponding immutable v6 release commit SHAs rather than downgrading to mutable v4 tags."
+    },
+    {
+      "finding_id": "FINDING-003",
+      "summary": "COR-001: Child args incorrectly pass command name for read/write/models",
+      "verification_evidence": "bin dispatch strips wrapper command token for worker commands and passes LLM_WORKER_TOOLS_COMMAND fallback\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-004",
+      "summary": "DA-004: Dependency cycle: 5 modules",
+      "verification_evidence": "Added scripts/command-metadata.mjs as leaf command metadata shared by bin and validation\nvalidate-plugin no longer imports CLI entrypoint\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-006",
+      "summary": "REL-001: MCP runWorker child process has no timeout",
+      "verification_evidence": "MCP server now calls worker helpers in-process, removing the parent child-process hang path\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-007",
+      "summary": "TST-002: No unit tests for cache logic, parseWorkerJson, setsEqual, or retry loop",
+      "verification_evidence": "Added node:test coverage for setsEqual, parseWorkerJson, cache helpers, model rotation, timeout retry, and signal passing\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-008",
+      "summary": "CFG-001: npm publish step has no NODE_AUTH_TOKEN and workflow_dispatch lacks branch guard",
+      "verification_evidence": "jobs.publish.if now allows tag pushes while restricting workflow_dispatch to the repository default branch and refs/heads/main.\nBoth dry-run and live publish steps set NODE_AUTH_TOKEN to ${{ secrets.NPM_TOKEN }}.\nRan workflow text checks confirming NODE_AUTH_TOKEN is present and the manual dispatch gate includes github.event.repository.default_branch."
+    },
+    {
+      "finding_id": "FINDING-009",
+      "summary": "COR-002: Privacy and ToS URLs point to OpenAI policies, not this project",
+      "verification_evidence": "Removed OpenAI privacy and terms URLs from .codex-plugin/plugin.json\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-010",
+      "summary": "REL-001: Unhandled stdin write error in MCP runWorker can crash the server",
+      "verification_evidence": "MCP no longer writes to a child stdin stream for tool calls\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-011",
+      "summary": "COR-002: Wrong legal policy URLs reference OpenAI instead of the actual plugin author",
+      "verification_evidence": "Removed unrelated OpenAI legal policy URLs from plugin manifest\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-012",
+      "summary": "TST-002: Zero test coverage for llm-worker.mjs critical paths",
+      "verification_evidence": "Worker module is importable without CLI side effects and covered by node:test\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-013",
+      "summary": "COR-002: AbortSignal not passed to model-selection or cache-refresh calls",
+      "verification_evidence": "AbortSignal is threaded through model listing, model selection, cache refresh, resolveModel, nextModel, and worker calls\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-017",
+      "summary": "OBS-004: MCP server silently discards worker stderr on successful exits",
+      "verification_evidence": "MCP tool calls collect worker diagnostics via logger and return them as separate text content when present\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-018",
+      "summary": "DR-001: MCP server spawns a new subprocess for every tool call",
+      "verification_evidence": "Refactored llm-worker.mjs to export runWorker/showModels and updated MCP server to call them in-process\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-019",
+      "summary": "PERF-002: MCP stdin accumulation uses Buffer.concat on every chunk, O(n^2) copy cost",
+      "verification_evidence": "Replaced per-chunk full inputBuffer concatenation with queued chunks and targeted byte consumption\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-022",
+      "summary": "OPR-001: No dry-run or pack preview before npm publish",
+      "verification_evidence": ".github/workflows/publish.yml now runs npm publish --dry-run --access public after npm test and before the live publish step.\nRan workflow text checks confirming npm test, package preview, and live npm publish execute in the expected order."
+    },
+    {
+      "finding_id": "FINDING-023",
+      "summary": "TST-001: No tests for bin CLI dispatch logic",
+      "verification_evidence": "Added bin dispatch tests for help, unknown command, worker/setup arg forwarding, env fallback, and spawn errors\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-024",
+      "summary": "TST-003: No tests for MCP protocol parsing and tool dispatch in llm-worker-mcp.mjs",
+      "verification_evidence": "Added MCP parser and dispatch tests for initialize, tools/list, validation, fragmented frames, concatenated frames, and invalid JSON recovery\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-025",
+      "summary": "DR-004: No timeout retry in the worker - transient backend pressure is fatal",
+      "verification_evidence": "Added verb-specific timeout config and one timeout retry with backoff before final timeout failure\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-026",
+      "summary": "MNT-001: opencode.json duplicates the full permission block under root and agent.auditor",
+      "verification_evidence": "opencode.json does not exist in this checkout; the duplicated OpenCode permission block described by the audit is absent, so no source change is appropriate."
+    },
+    {
+      "finding_id": "FINDING-028",
+      "summary": "COR-001: Stub/placeholder URLs do not resolve to the actual project",
+      "verification_evidence": "Updated homepage, repository, and interface.websiteURL to https://github.com/OhOkThisIsFine/llm-worker-tools\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-029",
+      "summary": "COR-005: validate-plugin.mjs resolves root from process.cwd() instead of script directory",
+      "verification_evidence": "validate-plugin now derives root from fileURLToPath(import.meta.url) instead of process.cwd()\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-030",
+      "summary": "CFG-003: workflow_dispatch trigger allows publish from any branch without a gate",
+      "verification_evidence": "jobs.publish.if now permits push events only when github.ref starts with refs/tags/v and permits workflow_dispatch only from refs/heads/main.\nRan workflow text checks confirming the tag gate and main-branch workflow_dispatch gate are present."
+    },
+    {
+      "finding_id": "FINDING-031",
+      "summary": "REL-003: is404() string match can falsely trigger model rotation on unrelated errors",
+      "verification_evidence": "is404 now checks structured status fields only and ignores arbitrary message text\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-032",
+      "summary": "REL-002: MCP server process does not exit when stdin closes",
+      "verification_evidence": "MCP server now handles stdin end/close with an idempotent shutdown path\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-034",
+      "summary": "COR-007: openai.yaml contains only interface display metadata with no agent name field",
+      "verification_evidence": "Added top-level name: \"llm-worker\" to skills/llm-worker/agents/openai.yaml\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-035",
+      "summary": "REL-004: bin child exit code defaults to 1 on signal termination, erasing signal context",
+      "verification_evidence": "bin exit handler now preserves numeric child exits and propagates child termination signals\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-036",
+      "summary": "OBS-001: Child process error handler omits command context",
+      "verification_evidence": "bin spawn error output now includes command and resolved script context\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-039",
+      "summary": "DR-010: Install script always overwrites AGENTS.md, discarding user customizations",
+      "verification_evidence": "installSharedInstructions now preserves customized AGENTS.md and appends a managed block instead of overwriting\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-040",
+      "summary": "OPR-002: install-ides.mjs prints no per-integration summary at completion",
+      "verification_evidence": "install-ides now records per-integration outcomes and prints a final summary\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-041",
+      "summary": "OPR-003: llm-worker-mcp.mjs emits no startup message to confirm server is ready",
+      "verification_evidence": "MCP server emits a startup readiness message to stderr before accepting stdio messages\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-043",
+      "summary": "DR-006: MCP server version is hardcoded instead of read from package.json",
+      "verification_evidence": "MCP initialize response reads serverInfo.version from package.json\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-044",
+      "summary": "MNT-002: package.json version not read by MCP server, causing hardcoded version drift",
+      "verification_evidence": "package.json remains the canonical MCP server version source\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-045",
+      "summary": "OBS-003: selectBestModel warning omits the raw LLM response that caused the mismatch",
+      "verification_evidence": "selectBestModel warning now includes normalized selection, fallback model, and JSON-stringified raw response content\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-046",
+      "summary": "PERF-001: setsEqual builds a new Set on every comparison call",
+      "verification_evidence": "setsEqual now performs allocation-free index comparison over sorted arrays\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-047",
+      "summary": "DR-009: Stateless per-call design not surfaced as a documented constraint",
+      "verification_evidence": "Documented stateless single-call limitation in shared policy, generated host files, and skills/llm-worker/SKILL.md\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-048",
+      "summary": "MNT-002: Third-party (OpenAI) policy URLs require external maintenance",
+      "verification_evidence": "Removed interface.privacyPolicyURL and interface.termsOfServiceURL from .codex-plugin/plugin.json because no project-owned legal pages exist and keeping unrelated OpenAI policy URLs was the maintenance risk."
+    },
+    {
+      "finding_id": "FINDING-049",
+      "summary": "OBS-002: Timeout error does not report verb or model in use",
+      "verification_evidence": "runWorker timeout failure messages include timeout duration, verb, and active model\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-050",
+      "summary": "MNT-001: Unfinished placeholder URLs spread across multiple fields",
+      "verification_evidence": "Replaced all bare https://github.com/ manifest placeholders with the canonical project URL\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-054",
+      "summary": "COR-006: install-ides.mjs CLAUDE.md append loses leading blank line from includeLine",
+      "verification_evidence": "Claude instruction append now builds a section without relying on a leading blank line and inserts an explicit separator only when needed\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-055",
+      "summary": "DR-007: llm-worker-codex.ps1 adds no unique value over the CLI",
+      "verification_evidence": "Removed scripts/llm-worker-codex.ps1 and validation references; skill docs use npx --yes llm-worker-tools commands\nnpm test\nnpm pack --dry-run --json"
+    },
+    {
+      "finding_id": "FINDING-057",
+      "summary": "COR-004: opencode.json bash permission uses bare 'audit-code' instead of full invocation path",
+      "verification_evidence": "opencode.json does not exist in this checkout; the stale audit-code permission prefixes described by the audit are absent, so no source change is appropriate."
+    },
+    {
+      "finding_id": "FINDING-058",
+      "summary": "COR-003: readInput falls through without specific error when stdin is non-TTY but empty",
+      "verification_evidence": "readInput now returns trimmed non-TTY stdin unconditionally, preserving empty stdin errors and preventing env fallback\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-059",
+      "summary": "COR-001: Unset env var resolves to empty string, not absent variable",
+      "verification_evidence": "Removed the VS Code MCP env placeholder from .vscode/mcp.json and sync-host-files template\nnpm test"
+    }
+  ],
+  "verified_no_change": [
+    {
+      "finding_id": "FINDING-005",
+      "summary": "DA-006: Dependency cycle: 5 modules",
+      "verification_evidence": "No source change required per prompt; current env-utils import direction remains acyclic\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-014",
+      "summary": "DA-009: Dependency cycle: 2 modules",
+      "verification_evidence": "No source change required per prompt; sync-host-files and validate-plugin are not in an ESM import cycle\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-015",
+      "summary": "DA-003: Dependency cycle: 4 modules",
+      "verification_evidence": "No source change required per prompt; env-utils remains a leaf utility and MCP imports worker one-way\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-016",
+      "summary": "DA-005: Dependency cycle: 4 modules",
+      "verification_evidence": "No source refactor required per prompt; CLI dispatch remains process-spawn based and validation does not import the CLI\nnpm test"
+    },
+    {
+      "finding_id": "FINDING-033",
+      "summary": "COR-001: No guard for missing or null prompt_path in next-step JSON output",
+      "verification_evidence": ".gemini/commands/audit-code.toml is absent; no source change appropriate per prompt"
+    },
+    {
+      "finding_id": "FINDING-037",
+      "summary": "MNT-002: Development override prefix duplicated in two code blocks",
+      "verification_evidence": ".gemini/commands/audit-code.toml is absent; no source change appropriate per prompt"
+    },
+    {
+      "finding_id": "FINDING-042",
+      "summary": "MNT-001: Magic constant --host-max-active-subagents 4 repeated three times",
+      "verification_evidence": ".gemini/commands/audit-code.toml is absent; no source change appropriate per prompt"
+    },
+    {
+      "finding_id": "FINDING-051",
+      "summary": "DA-010: 2 orphan unit(s) with no graph connections",
+      "verification_evidence": "No source change needed per prompt; plugin manifest and VS Code config are host-discovered entrypoints"
+    },
+    {
+      "finding_id": "FINDING-052",
+      "summary": "OBS-001: ensure --quiet suppresses setup failure output",
+      "verification_evidence": ".gemini/commands/audit-code.toml is absent; no source change appropriate per prompt"
+    },
+    {
+      "finding_id": "FINDING-056",
+      "summary": "COR-002: No error-handling instruction for non-zero exit from audit-code commands",
+      "verification_evidence": ".gemini/commands/audit-code.toml is absent; no source change appropriate per prompt"
+    }
+  ],
+  "inappropriate": [
+    {
+      "finding_id": "FINDING-020",
+      "rationale": "User explicitly skipped this item during implementation preview: having an LLM rank models is acceptable, and replacing it with deterministic heuristics has too many edge cases."
+    }
+  ],
+  "ignored": [
+    {
+      "finding_id": "FINDING-021",
+      "rationale": "The requested per-host installer module decomposition is a broad architecture refactor; I only made the approved local installer fixes that were safe in this dirty worktree."
+    },
+    {
+      "finding_id": "FINDING-027",
+      "rationale": "The requested broad risk-concentration decomposition overlaps the larger installer decomposition and could not be safely completed as a bounded B-002 edit."
+    },
+    {
+      "finding_id": "FINDING-038",
+      "rationale": "The MCP SDK migration requires adding a new dependency and a full protocol refactor; I preserved and tested the existing stdio parser instead."
+    },
+    {
+      "finding_id": "FINDING-053",
+      "rationale": "I added prepack/prepublishOnly host-file sync and verified npm pack includes generated outputs, but excluding/removing generated files from source-control diffs would require .gitignore or index changes outside the allowed B-002 edit list and would risk trampling existing dirty generated-file edits."
+    }
+  ],
+  "combined_test_result": {
+    "passed": true
+  },
+  "closing_result": {
+    "action": "none",
+    "status": "skipped",
+    "commands": []
+  }
+}

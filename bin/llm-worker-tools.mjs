@@ -3,55 +3,64 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import process from "node:process";
+import { SCRIPT_BY_COMMAND, isWorkerCommand, usageText } from "../scripts/command-metadata.mjs";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const args = process.argv.slice(2);
-const command = args[0];
-
-const scriptByCommand = new Map([
-  ["install", "scripts/install-ides.mjs"],
-  ["setup", "scripts/install-ides.mjs"],
-  ["mcp", "scripts/llm-worker-mcp.mjs"],
-  ["read", "llm-worker.mjs"],
-  ["write", "llm-worker.mjs"],
-  ["models", "llm-worker.mjs"],
-]);
 
 function usage() {
-  console.log([
-    "Usage:",
-    "  llm-worker-tools install",
-    "  llm-worker-tools read   [--model <id>] [--input <path>]",
-    "  llm-worker-tools write  [--model <id>] [--input <path>]",
-    "  llm-worker-tools models [--refresh]",
-    "  llm-worker-tools mcp",
-  ].join("\n"));
+  console.log(usageText());
 }
 
-if (!command || command === "--help" || command === "-h") {
-  usage();
-  process.exit(0);
+export function dispatch(argv = process.argv, { spawnFn = spawn, exitFn = process.exit, stdout = console.log, stderr = console.error } = {}) {
+  const args = argv.slice(2);
+  const command = args[0];
+
+  if (!command || command === "--help" || command === "-h") {
+    stdout(usageText());
+    exitFn(0);
+    return null;
+  }
+
+  if (!SCRIPT_BY_COMMAND.has(command)) {
+    stderr(`Unknown command: ${command}`);
+    stdout(usageText());
+    exitFn(1);
+    return null;
+  }
+
+  const script = path.join(packageRoot, SCRIPT_BY_COMMAND.get(command));
+  const childArgs = args.slice(1);
+  const env = isWorkerCommand(command)
+    ? { ...process.env, LLM_WORKER_TOOLS_COMMAND: command }
+    : process.env;
+
+  const child = spawnFn(process.execPath, [script, ...childArgs], {
+    cwd: packageRoot,
+    env,
+    stdio: "inherit",
+  });
+
+  child.on("exit", (code, signal) => {
+    if (code !== null) {
+      exitFn(code);
+      return;
+    }
+    if (signal) {
+      process.kill(process.pid, signal);
+      return;
+    }
+    exitFn(1);
+  });
+  child.on("error", error => {
+    stderr(`Failed to spawn command "${command}" (script: ${script}).`);
+    stderr(error?.stack || error?.message || String(error));
+    exitFn(1);
+  });
+
+  return { command, script, childArgs };
 }
 
-if (!scriptByCommand.has(command)) {
-  console.error(`Unknown command: ${command}`);
-  usage();
-  process.exit(1);
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  dispatch();
 }
-
-const script = path.join(packageRoot, scriptByCommand.get(command));
-// install/setup/mcp strip the command word (args.slice(1)) because their scripts parse only flags; read/write/models forward full args because llm-worker.mjs expects the verb as argv[2].
-const childArgs = ["install", "setup", "mcp"].includes(command) ? args.slice(1) : args;
-
-const child = spawn(process.execPath, [script, ...childArgs], {
-  cwd: packageRoot,
-  env: process.env,
-  stdio: "inherit",
-});
-
-child.on("exit", code => process.exit(code ?? 1));
-child.on("error", error => {
-  console.error(error?.stack || error?.message || String(error));
-  process.exit(1);
-});
-

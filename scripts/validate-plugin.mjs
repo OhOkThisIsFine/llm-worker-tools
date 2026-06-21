@@ -4,9 +4,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { SCRIPT_BY_COMMAND } from "./command-metadata.mjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const root = path.resolve(__dirname, "..");
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const requiredFiles = [
   ".codex-plugin/plugin.json",
   ".github/copilot-instructions.md",
@@ -18,10 +18,10 @@ const requiredFiles = [
   "claude-desktop-config.example.json",
   "shared/ambient-agent-policy.md",
   "bin/llm-worker-tools.mjs",
+  "scripts/command-metadata.mjs",
   "scripts/env-utils.mjs",
   "scripts/install-ides.mjs",
   "scripts/sync-host-files.mjs",
-  "scripts/llm-worker-codex.ps1",
   "scripts/llm-worker-mcp.mjs",
   "llm-worker.mjs"
 ];
@@ -57,6 +57,25 @@ if (manifest.skills !== "./skills/") {
   fail(`plugin.json skills must be ./skills/, got ${manifest.skills}`);
 }
 
+for (const command of ["install", "setup", "mcp", "read", "write", "models"]) {
+  if (!SCRIPT_BY_COMMAND.has(command)) {
+    fail(`Missing CLI command metadata for ${command}.`);
+  }
+}
+
+for (const field of ["homepage", "repository"]) {
+  if (manifest[field] === "https://github.com/") {
+    fail(`plugin.json ${field} must not be the bare GitHub root placeholder.`);
+  }
+}
+
+for (const field of ["privacyPolicyURL", "termsOfServiceURL"]) {
+  const value = manifest.interface[field];
+  if (typeof value === "string" && value.includes("openai.com/policies")) {
+    fail(`plugin.json interface.${field} must not point to OpenAI policies.`);
+  }
+}
+
 const skillText = fs.readFileSync(path.join(root, "skills/llm-worker/SKILL.md"), "utf8").replace(/\r\n/g, "\n");
 if (!skillText.startsWith("---\n")) {
   fail("SKILL.md must start with YAML frontmatter.");
@@ -88,7 +107,7 @@ if (mcpCheck.status !== 0) {
   fail("llm-worker-mcp.mjs failed node --check.");
 }
 
-for (const script of ["bin/llm-worker-tools.mjs", "scripts/env-utils.mjs", "scripts/install-ides.mjs", "scripts/sync-host-files.mjs"]) {
+for (const script of ["bin/llm-worker-tools.mjs", "scripts/command-metadata.mjs", "scripts/env-utils.mjs", "scripts/install-ides.mjs", "scripts/sync-host-files.mjs"]) {
   const scriptCheck = spawnSync(process.execPath, ["--check", path.join(root, script)], {
     cwd: root,
     stdio: "inherit"

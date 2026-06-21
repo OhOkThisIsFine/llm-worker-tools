@@ -1,6 +1,6 @@
 {
   "name": "llm-worker-tools",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Ambient LLM worker tools for coding agents across Codex, Claude Desktop, VS Code, and OpenCode.",
   "type": "module",
   "private": false,
@@ -14,7 +14,9 @@
     "install:ides": "node scripts/install-ides.mjs --use-local-paths",
     "sync:ides": "node scripts/sync-host-files.mjs",
     "check:ides": "node scripts/sync-host-files.mjs --check",
-    "test": "npm run check:ides && npm run smoke:codex-plugin",
+    "prepack": "node scripts/sync-host-files.mjs",
+    "prepublishOnly": "node scripts/sync-host-files.mjs",
+    "test": "node --test \"test/*.test.mjs\" && npm run check:ides && npm run smoke:codex-plugin",
     "smoke:codex-plugin": "node scripts/validate-plugin.mjs"
   },
   "files": [
