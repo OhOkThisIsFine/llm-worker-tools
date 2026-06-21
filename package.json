@@ -9,6 +9,7 @@
     "llm-worker-tools": "./bin/llm-worker-tools.mjs"
   },
   "scripts": {
+    "check": "node --check llm-worker.mjs bin/llm-worker-tools.mjs scripts/llm-worker-mcp.mjs scripts/validate-plugin.mjs scripts/install-ides.mjs scripts/sync-host-files.mjs",
     "setup:ides": "npm install && node scripts/install-ides.mjs --use-local-paths",
     "install:ides": "node scripts/install-ides.mjs --use-local-paths",
     "sync:ides": "node scripts/sync-host-files.mjs",
