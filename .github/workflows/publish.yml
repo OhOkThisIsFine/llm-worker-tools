@@ -17,10 +17,16 @@ jobs:
       (github.event_name == 'workflow_dispatch' &&
         github.ref_name == github.event.repository.default_branch &&
         github.ref == 'refs/heads/main')
-    # MANUAL PREREQUISITE: This gate is inert until the named GitHub Environment
-    # is created in repo Settings > Environments with required reviewers configured.
-    # Scope NPM_TOKEN to that environment as an environment secret; otherwise the
-    # required-reviewer approval is not enforced before the irreversible npm publish.
+    # Publishing uses npm Trusted Publishing (OIDC). The `id-token: write`
+    # permission lets `npm publish` authenticate via a short-lived OIDC token
+    # and attach SLSA build provenance — no NPM_TOKEN secret is required.
+    # Configure the package's trusted publisher on npmjs.com (package >
+    # Settings > Trusted Publisher) to point at this repo + workflow.
+    #
+    # The `environment:` gate controls WHEN GitHub will mint that OIDC token:
+    # it is inert until the named Environment is created in repo Settings >
+    # Environments with required reviewers, after which the irreversible
+    # publish pauses for approval before the token is issued.
     environment: release
     runs-on: ubuntu-latest
     steps:
@@ -34,8 +40,4 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm publish --dry-run --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
