@@ -94,3 +94,38 @@ test("bin dispatch includes context on spawn errors", () => {
   assert.match(stderr.join("\n"), /llm-worker\.mjs/);
   assert.match(stderr.join("\n"), /spawn failed/);
 });
+
+test("bin dispatch settles once when error follows exit", () => {
+  const calls = [];
+  const child = new EventEmitter();
+  const exits = [];
+
+  dispatch(["node", "bin", "models"], {
+    spawnFn: fakeSpawn(calls, child),
+    stdout: () => {},
+    stderr: () => {},
+    exitFn: code => exits.push(code),
+  });
+
+  child.emit("exit", 0, null);
+  child.emit("error", new Error("late error"));
+  assert.deepEqual(exits, [0]);
+});
+
+test("bin dispatch settles once when exit follows error", () => {
+  const calls = [];
+  const child = new EventEmitter();
+  const exits = [];
+  const stderr = [];
+
+  dispatch(["node", "bin", "models"], {
+    spawnFn: fakeSpawn(calls, child),
+    stdout: () => {},
+    stderr: message => stderr.push(message),
+    exitFn: code => exits.push(code),
+  });
+
+  child.emit("error", new Error("spawn failed"));
+  child.emit("exit", 0, null);
+  assert.deepEqual(exits, [1]);
+});

@@ -41,7 +41,13 @@ export function dispatch(argv = process.argv, { spawnFn = spawn, exitFn = proces
     stdio: "inherit",
   });
 
+  let settled = false;
+
   child.on("exit", (code, signal) => {
+    if (settled) {
+      return;
+    }
+    settled = true;
     if (code !== null) {
       exitFn(code);
       return;
@@ -53,6 +59,10 @@ export function dispatch(argv = process.argv, { spawnFn = spawn, exitFn = proces
     exitFn(1);
   });
   child.on("error", error => {
+    if (settled) {
+      return;
+    }
+    settled = true;
     stderr(`Failed to spawn command "${command}" (script: ${script}).`);
     stderr(error?.stack || error?.message || String(error));
     exitFn(1);
