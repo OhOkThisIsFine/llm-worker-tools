@@ -6,3 +6,6 @@ node_modules/
 # audit-tools / audit-code local run + install scratch (not part of the package)
 .audit-tools/
 .audit-code/
+.agent/skills/audit-code/
+.github/agents/
+.github/prompts/
