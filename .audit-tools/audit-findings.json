@@ -1,0 +1,1538 @@
+{
+  "contract_version": "audit-tools/audit-findings/v1alpha1",
+  "summary": {
+    "finding_count": 58,
+    "work_block_count": 5,
+    "severity_breakdown": {
+      "high": 7,
+      "medium": 24,
+      "low": 24,
+      "info": 3
+    },
+    "lens_breakdown": {
+      "architecture": 26,
+      "maintainability": 21,
+      "reliability": 2,
+      "correctness": 3,
+      "tests": 5,
+      "config_deployment": 1
+    },
+    "audited_file_count": 6,
+    "excluded_file_count": 15,
+    "budget_deferred_task_count": 0,
+    "grounding_status_breakdown": {
+      "grounded": 29
+    },
+    "runtime_validation_status_breakdown": {
+      "confirmed": 1
+    }
+  },
+  "findings": [
+    {
+      "id": "ARC-3227f893",
+      "title": "\"Backend-neutral\" is the stated identity but the design is hard-bound to the OpenAI SDK and chat/completions shape",
+      "category": "core_assumption",
+      "severity": "high",
+      "confidence": "high",
+      "lens": "architecture",
+      "summary": "The README and policy docs sell this tool as \"backend-neutral\" / \"OpenAI-compatible backend\", but every backend interaction is expressed directly in terms of the `openai` npm SDK and its exact wire contract: `new OpenAI({...})`, `client.models.list()`, and `client.chat.completions.create({ model, temperature, max_tokens, messages })` in llm-worker.mjs. The load-bearing assumption is that any backend a user points at speaks the OpenAI chat-completions dialect AND exposes a `/models` listing endpoint. That assumption is doing a lot of unguarded work: the entire model-selection / fallback machinery (fetchModelList, selectBestModel, nextModel) only functions if `models.list()` returns a meaningful enumerable list, which many OpenAI-compatible servers (llama.cpp single-model, vLLM with one served model, Anthropic-via-proxy, Ollama's native API) do not provide in the same shape. If the goal really is neutrality, the single most valuable change is to introduce a thin Backend interface (listModels / complete) with the OpenAI implementation behind it, so the neutrality claim is structural rather than aspirational. If neutrality is NOT actually a goal, the docs should stop claiming it. Right now the marketing and the code disagree about what the product is.",
+      "affected_files": [
+        {
+          "path": "llm-worker.mjs"
+        },
+        {
+          "path": "README.md"
+        },
+        {
+          "path": "shared/ambient-agent-policy.md"
+        }
+      ],
+      "systemic": true,
+      "grounding": {
+        "status": "grounded"
+      },
+      "evidence": []
+    },
+    {
+      "id": "ARC-1a6dcc69",
+      "title": "Dependency cycle: 5 modules",
+      "category": "dependency_cycle",
+      "severity": "high",
+      "confidence": "high",
+      "lens": "architecture",
+      "summary": "Circular dependency among scripts/install-ides.mjs → scripts/llm-worker-mcp.mjs → package.json → scripts/sync-host-files.mjs → scripts/validate-plugin.mjs → scripts/install-ides.mjs. Cycles increase coupling, complicate testing, and can cause initialization-order bugs.",
+      "affected_files": [
+        {
+          "path": "scripts/install-ides.mjs"
+        },
+        {
+          "path": "scripts/llm-worker-mcp.mjs"
+        },
+        {
+          "path": "package.json"
+        },
+        {
+          "path": "scripts/sync-host-files.mjs"
+        },
+        {
+          "path": "scripts/validate-plugin.mjs"
+        }
+      ],
+      "systemic": true,
+      "evidence": []
+    },
+    {
+      "id": "ARC-aa12e390",
+      "title": "Dependency cycle: 6 modules",
+      "category": "dependency_cycle",
+      "severity": "high",
+      "confidence": "high",
+      "lens": "architecture",
+      "summary": "Circular dependency among bin/llm-worker-tools.mjs → scripts/command-metadata.mjs → scripts/env-utils.mjs → scripts/install-ides.mjs → scripts/llm-worker-mcp.mjs → package.json → scripts/sync-host-files.mjs → scripts/validate-plugin.mjs → bin/llm-worker-tools.mjs. Cycles increase coupling, complicate testing, and can cause initialization-order bugs.",
+      "affected_files": [
+        {
+          "path": "bin/llm-worker-tools.mjs"
+        },
+        {
+          "path": "package.json"
+        },
+        {
+          "path": "scripts/command-metadata.mjs"
+        },
+        {
+          "path": "scripts/env-utils.mjs"
+        },
+        {
+          "path": "scripts/install-ides.mjs"
+        },
+        {
+          "path": "scripts/llm-worker-mcp.mjs"
+        },
+        {
+          "path": "scripts/sync-host-files.mjs"
+        },
+        {
+          "path": "scripts/validate-plugin.mjs"
+        }
+      ],
+      "systemic": true,
+      "evidence": []
+    },
+    {
+      "id": "ARC-a41851b5",
+      "title": "Dependency cycle: 7 modules",
+      "category": "dependency_cycle",
+      "severity": "high",
+      "confidence": "high",
+      "lens": "architecture",
+      "summary": "Circular dependency among scripts/command-metadata.mjs → scripts/env-utils.mjs → scripts/install-ides.mjs → scripts/llm-worker-mcp.mjs → package.json → scripts/sync-host-files.mjs → scripts/validate-plugin.mjs → scripts/command-metadata.mjs. Cycles increase coupling, complicate testing, and can cause initialization-order bugs.",
+      "affected_files": [
+        {
+          "path": "scripts/command-metadata.mjs"
+        },
+        {
+          "path": "scripts/env-utils.mjs"
+        },
+        {
+          "path": "scripts/install-ides.mjs"
+        },
+        {
+          "path": "scripts/llm-worker-mcp.mjs"
+        },
+        {
+          "path": "package.json"
+        },
+        {
+          "path": "scripts/sync-host-files.mjs"
+        },
+        {
+          "path": "scripts/validate-plugin.mjs"
+        }
+      ],
+      "systemic": true,
+      "evidence": []
+    },
+    {
+      "id": "ARC-1a6dcc69-2",
+      "title": "Host-integration config has two sources of truth (install scripts vs. sync generator), with a validator bolted on to police the drift",
+      "category": "architecture_pattern",
+      "severity": "high",
+      "confidence": "high",
+      "lens": "architecture",
+      "summary": "The same logical artifacts — the MCP server stanza and the ambient-agent policy text injected into each host — are produced in two independent places using two different mechanisms. install-ides.mjs builds the server config as live JS objects (mcpServerForVSCode/Claude/OpenCode) and writes them into real user config files; sync-host-files.mjs re-emits the *same* server config and the *same* policy as hand-templated string literals into the in-repo tracked copies (.vscode/mcp.json, claude-desktop-config.example.json, CLAUDE.md, AGENTS.md, copilot-instructions.md, the OpenCode agent). These are not generated from a shared model — they are parallel hand-maintained renderings of one concept. validate-plugin.mjs + the `check:ides` gate exist specifically to detect when these two renderings drift apart, which is the classic signature of a missing single source of truth: the system spends real machinery catching a problem it could have made unrepresentable. The high-leverage redesign is to define the host targets declaratively (one table of {host, configPath, serverShape, instructionFormat}) and have BOTH the in-repo sync output and the live installer render from that one table. Today, adding a host or changing the MCP invocation means editing the logic in two files and praying the validator catches the rest.",
+      "affected_files": [
+        {
+          "path": "scripts/install-ides.mjs"
+        },
+        {
+          "path": "scripts/sync-host-files.mjs"
+        },
+        {
+          "path": "scripts/validate-plugin.mjs"
+        }
+      ],
+      "systemic": true,
+      "grounding": {
+        "status": "grounded"
+      },
+      "evidence": []
+    },
+    {
+      "id": "ARC-3227f893-2",
+      "title": "Model auto-selection can turn one cheap `read` into many backend calls, undermining the \"effectively free\" premise",
+      "category": "structural_risk",
+      "severity": "high",
+      "confidence": "high",
+      "lens": "architecture",
+      "summary": "The whole product is justified by one economic claim repeated in every doc: worker calls are \"effectively free compared to primary-agent quota.\" But the model-resolution path quietly violates that premise. On any cache miss, selectBestModel iterates the model list and issues a full chat.completions probe per bootstrap candidate until one answers (llm-worker.mjs:236-270). Worse, inside runWorker a single 404 from the chosen model triggers nextModel, which re-runs selectBestModel over the remaining candidates — another fan-out of probe calls — and this is inside a retry loop (llm-worker.mjs:401-438). A backend with a long or flaky model list can make one user-issued `read` cost an unbounded number of backend round-trips before any real work happens. The cache mitigates steady state, but the cache key is only (base_url, model-set membership) with a 24h TTL (cacheIsFresh), so it never reflects whether the selected model is actually still serving, and the worst-case cold/large-list behavior is exactly when the user is most likely to be waiting. The design should (a) bound selection to a single bootstrap probe or a deterministic-first strategy, and (b) treat the LLM-driven \"pick the best model\" step as an optional optimization, not the default hot path — the deterministicFallbackModel logic already proves a no-extra-call heuristic selection is feasible.",
+      "affected_files": [
+        {
+          "path": "llm-worker.mjs"
+        }
+      ],
+      "systemic": true,
+      "grounding": {
+        "status": "grounded"
+      },
+      "evidence": []
+    },
+    {
+      "id": "ARC-3227f893-3",
+      "title": "Runtime model-failure recovery is narrower than selection-time eligibility (404-only vs 400/404/422)",
+      "category": "invariant_counterexample",
+      "severity": "high",
+      "confidence": "high",
+      "lens": "architecture",
+      "summary": "Two predicates encode the same inferred contract -- 'a model the backend will not serve must be skipped and the worker must advance to another candidate' -- but they disagree on what counts as unservable. selectBestModel (llm-worker.mjs:249) skips a bootstrap model when isUnsupportedModel(err) is true, treating HTTP 400, 404, and 422 as 'this model cannot be used here'. The hot path in runWorker (llm-worker.mjs:421) only advances to nextModel when is404(err) is true; a 400 or 422 returned by the chat.completions call is rethrown and aborts the whole invocation. Counterexample: a backend whose selected model rejects a particular request shape with 422 (or returns 400 for an unsupported parameter such as temperature/max_tokens) was deemed selectable by isUnsupportedModel logic during selection but is fatal at call time -- the documented 'fall through to the next model' guarantee silently does not hold for that class of error. Recommend making the runtime retry predicate consistent with the selection-time predicate (or documenting the intentional asymmetry), so the critical 'advance on unservable model' flow covers the same status codes end to end.",
+      "affected_files": [
+        {
+          "path": "llm-worker.mjs"
+        }
+      ],
+      "systemic": true,
+      "grounding": {
+        "status": "grounded"
+      },
+      "evidence": []
+    },
+    {
+      "id": "ARC-eaffc6ab",
+      "title": "Dependency cycle: 2 modules",
+      "category": "dependency_cycle",
+      "severity": "medium",
+      "confidence": "high",
+      "lens": "architecture",
+      "summary": "Circular dependency among scripts/env-utils.mjs → scripts/install-ides.mjs → scripts/llm-worker-mcp.mjs → scripts/env-utils.mjs. Cycles increase coupling, complicate testing, and can cause initialization-order bugs.",
+      "affected_files": [
+        {
+          "path": "package.json"
+        },
+        {
+          "path": "scripts/env-utils.mjs"
+        },
+        {
+          "path": "scripts/install-ides.mjs"
+        },
+        {
+          "path": "scripts/llm-worker-mcp.mjs"
+        }
+      ],
+      "systemic": true,
+      "evidence": []
+    },
+    {
+      "id": "ARC-4f12cf70",
+      "title": "Dependency cycle: 4 modules",
+      "category": "dependency_cycle",
+      "severity": "medium",
+      "confidence": "high",
+      "lens": "architecture",
+      "summary": "Circular dependency among scripts/env-utils.mjs → scripts/install-ides.mjs → scripts/llm-worker-mcp.mjs → llm-worker.mjs → scripts/env-utils.mjs. Cycles increase coupling, complicate testing, and can cause initialization-order bugs.",
+      "affected_files": [
+        {
+          "path": "scripts/env-utils.mjs"
+        },
+        {
+          "path": "scripts/install-ides.mjs"
+        },
+        {
+          "path": "scripts/llm-worker-mcp.mjs"
+        },
+        {
+          "path": "llm-worker.mjs"
+        }
+      ],
+      "systemic": true,
+      "evidence": []
+    },
+    {
+      "id": "MNT-6d8cf619",
+      "title": "Full permission block duplicated under root and agent.auditor in opencode.json",
+      "category": "duplicated-logic",
+      "severity": "medium",
+      "confidence": "high",
+      "lens": "maintainability",
+      "summary": "The entire ~45-line permission block (read/glob/grep/external_directory/edit/bash deny+allow lists) is copied verbatim under both the root 'permission' key and 'agent.auditor.permission'. Every permission edit must be made in two places to stay consistent; remediation-report.json FINDING-026 confirms this was kept in sync by a validate-plugin parity check rather than single-sourced.",
+      "affected_files": [
+        {
+          "path": "opencode.json",
+          "line_start": 5,
+          "line_end": 52,
+          "symbol": "permission",
+          "quoted_text": "\"audit-code synthesize*\": \"deny\","
+        },
+        {
+          "path": "opencode.json",
+          "line_start": 57,
+          "line_end": 104,
+          "symbol": "agent.auditor.permission",
+          "quoted_text": "\"audit-code synthesize*\": \"deny\","
+        },
+        {
+          "path": "remediation-report.json",
+          "line_start": 99,
+          "line_end": 101,
+          "quoted_text": "opencode.json duplicates the full permission block under root and agent.auditor"
+        }
+      ],
+      "evidence": [
+        "opencode.json:5-52 - root permission block with full bash deny/allow lists",
+        "opencode.json:57-104 - agent.auditor.permission is a verbatim copy of the same block",
+        "remediation-report.json:101 - FINDING-026 notes the duplication is guarded by a validate-plugin parity check (drift guard) instead of extracted to one shared source"
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    },
+    {
+      "id": "ARC-3227f893-4",
+      "title": "MCP transport enforces an input-size ceiling that the CLI/stdin entrypoint does not",
+      "category": "trust_boundary_gap",
+      "severity": "medium",
+      "confidence": "high",
+      "lens": "architecture",
+      "summary": "The MCP boundary establishes an explicit input contract: callTool rejects non-string/empty input and enforces MAX_INPUT_BYTES = 1 MiB (scripts/llm-worker-mcp.mjs:196-201), with a documented MAX_FRAME_BYTES cap at the byte boundary before allocation. The other externally reachable surface into the identical runWorker core -- readInput on the CLI/stdin path (llm-worker.mjs:160-175) -- shares no such ceiling: it reads the entire stdin / --input file / LLM_WORKER_INPUT_PATH into memory and forwards it to the backend with only an emptiness check. Both surfaces funnel into the same runWorker, so the protective invariant asserted at one trust boundary is absent at the other. Counterexample: piping a multi-hundred-MB file to 'llm read' bypasses the 1 MiB guard entirely and is sent to the backend (subject only to backend-side limits), whereas the same payload via the MCP tool is rejected deterministically. Recommend hoisting the size/emptiness contract into runWorker (or a shared validator) so every entrypoint enforces it uniformly.",
+      "affected_files": [
+        {
+          "path": "llm-worker.mjs"
+        },
+        {
+          "path": "scripts/llm-worker-mcp.mjs"
+        }
+      ],
+      "systemic": true,
+      "grounding": {
+        "status": "grounded"
+      },
+      "evidence": []
+    },
+    {
+      "id": "ARC-3227f893-5",
+      "title": "nextModel persists a 404-recovery pick as the cache's 'best model', corrupting the selection invariant",
+      "category": "inferred_contract_gap",
+      "severity": "medium",
+      "confidence": "high",
+      "lens": "architecture",
+      "summary": "The cache contract inferred from refreshCache/resolveModel is that cache.selected_model holds the single best general-purpose model for the current base_url and model set, and cacheIsFresh (llm-worker.mjs:225) trusts that field for up to MAX_CACHE_AGE_MS (24h). nextModel (llm-worker.mjs:331) violates that invariant: when the chosen model returns 404 mid-request, it calls selectBestModel over the *shrunken* candidate set (best minus already-tried models) and then writeCache({...existing, selected_model: selected}). This writes a degraded, second-choice model into the field that the rest of the system treats as 'best', without updating fetched_at semantics around quality. Counterexample: model A (best) transiently 404s once; nextModel picks B and persists selected_model=B; every subsequent invocation for the next 24h reads a fresh cache and uses B even after A recovers, because resolveModel never re-selects while the cache is fresh. The recovery pick should be used for the in-flight request without overwriting the persisted best-model selection, or the persistence should be explicitly time-boxed/marked as a fallback.",
+      "affected_files": [
+        {
+          "path": "llm-worker.mjs"
+        }
+      ],
+      "systemic": true,
+      "grounding": {
+        "status": "grounded"
+      },
+      "evidence": []
+    },
+    {
+      "id": "ARC-aa12e390-2",
+      "title": "Risk concentrated in top quartile of units",
+      "category": "risk_concentration",
+      "severity": "medium",
+      "confidence": "high",
+      "lens": "architecture",
+      "summary": "60% of total risk score is concentrated in the top 5 of 18 units: bin, scripts, module-llm-worker-mjs, skills-llm-worker, tests-llm-worker-test-mjs. Consider decomposing high-risk units or adding isolation boundaries.",
+      "affected_files": [
+        {
+          "path": "bin/llm-worker-tools.mjs"
+        },
+        {
+          "path": "scripts/command-metadata.mjs"
+        },
+        {
+          "path": "scripts/env-utils.mjs"
+        },
+        {
+          "path": "scripts/install-ides.mjs"
+        },
+        {
+          "path": "scripts/llm-worker-mcp.mjs"
+        },
+        {
+          "path": "scripts/sync-host-files.mjs"
+        },
+        {
+          "path": "scripts/validate-plugin.mjs"
+        },
+        {
+          "path": "llm-worker.mjs"
+        },
+        {
+          "path": "skills/llm-worker/agents/openai.yaml"
+        },
+        {
+          "path": "test/llm-worker.test.mjs"
+        }
+      ],
+      "systemic": true,
+      "evidence": []
+    },
+    {
+      "id": "ARC-5ce6946d",
+      "title": "The MCP server and CLI duplicate input handling instead of sharing one entry boundary",
+      "category": "design_simplification",
+      "severity": "medium",
+      "confidence": "high",
+      "lens": "architecture",
+      "summary": "There are two front doors to runWorker — the CLI (llm-worker.mjs main/runWorker reading stdin or --input via readInput) and the MCP server (scripts/llm-worker-mcp.mjs callTool taking an `input` string argument). They enforce different and partially overlapping contracts: the MCP path adds a MAX_INPUT_BYTES ceiling and non-empty-string validation that the CLI path does not, while the CLI path owns stdin/TTY/env-input resolution the MCP path doesn't need. The size guard, the empty-input guard, and the \"what counts as valid worker input\" rule are genuinely one concern that is currently expressed in two places with different strictness — a `read` over a 5 MB file is rejected through MCP but accepted through the CLI. As more transports appear (the file inventory already hints at multiple host integrations), this divergence multiplies. Consolidating input admission (size + emptiness + normalization) into a single function that both runWorker entry points call would remove a whole class of \"behaves differently depending on how you invoked it\" bugs and make the byte ceiling a real product invariant rather than an MCP-only one.",
+      "affected_files": [
+        {
+          "path": "scripts/llm-worker-mcp.mjs"
+        },
+        {
+          "path": "llm-worker.mjs"
+        }
+      ],
+      "systemic": true,
+      "grounding": {
+        "status": "grounded"
+      },
+      "evidence": []
+    },
+    {
+      "id": "ARC-34b93d00",
+      "title": "Architectural seam: .gemini/commands ↔ .gemini/commands/audit-code.toml",
+      "category": "architectural_seam",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "architecture",
+      "summary": "The dependency between .gemini/commands and .gemini/commands/audit-code.toml is a bridge (cut-edge): its removal disconnects the two regions. A single load-bearing link is a fragility and refactor risk.",
+      "affected_files": [
+        {
+          "path": ".gemini/commands"
+        },
+        {
+          "path": ".gemini/commands/audit-code.toml"
+        }
+      ],
+      "systemic": true,
+      "evidence": []
+    },
+    {
+      "id": "ARC-63c8b5a8",
+      "title": "Architectural seam: .github/workflows ↔ .github/workflows/publish.yml",
+      "category": "architectural_seam",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "architecture",
+      "summary": "The dependency between .github/workflows and .github/workflows/publish.yml is a bridge (cut-edge): its removal disconnects the two regions. A single load-bearing link is a fragility and refactor risk.",
+      "affected_files": [
+        {
+          "path": ".github/workflows"
+        },
+        {
+          "path": ".github/workflows/publish.yml"
+        }
+      ],
+      "systemic": true,
+      "evidence": []
+    },
+    {
+      "id": "ARC-94320dff",
+      "title": "Architectural seam: .remediation-artifacts/steps ↔ .remediation-artifacts/steps/current-step.json",
+      "category": "architectural_seam",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "architecture",
+      "summary": "The dependency between .remediation-artifacts/steps and .remediation-artifacts/steps/current-step.json is a bridge (cut-edge): its removal disconnects the two regions. A single load-bearing link is a fragility and refactor risk.",
+      "affected_files": [
+        {
+          "path": ".remediation-artifacts/steps"
+        },
+        {
+          "path": ".remediation-artifacts/steps/current-step.json"
+        }
+      ],
+      "systemic": true,
+      "evidence": []
+    },
+    {
+      "id": "ARC-3227f893-6",
+      "title": "Architectural seam: llm-worker.mjs ↔ test/deterministic-fallback.test.mjs",
+      "category": "architectural_seam",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "architecture",
+      "summary": "The dependency between llm-worker.mjs and test/deterministic-fallback.test.mjs is a bridge (cut-edge): its removal disconnects the two regions. A single load-bearing link is a fragility and refactor risk.",
+      "affected_files": [
+        {
+          "path": "llm-worker.mjs"
+        },
+        {
+          "path": "test/deterministic-fallback.test.mjs"
+        },
+        {
+          "path": "test/llm-worker.test.mjs"
+        },
+        {
+          "path": "test/model-fallback.test.mjs"
+        }
+      ],
+      "systemic": true,
+      "evidence": [
+        "runtime:unit:tests-model-fallback-test-mjs: confirmed — Deterministic runtime command succeeded: npm test"
+      ]
+    },
+    {
+      "id": "ARC-4f12cf70-2",
+      "title": "Architectural seam: scripts/env-utils.mjs ↔ test/env-utils.test.mjs",
+      "category": "architectural_seam",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "architecture",
+      "summary": "The dependency between scripts/env-utils.mjs and test/env-utils.test.mjs is a bridge (cut-edge): its removal disconnects the two regions. A single load-bearing link is a fragility and refactor risk.",
+      "affected_files": [
+        {
+          "path": "scripts/env-utils.mjs"
+        },
+        {
+          "path": "test/env-utils.test.mjs"
+        }
+      ],
+      "systemic": true,
+      "evidence": []
+    },
+    {
+      "id": "ARC-f833f9fb",
+      "title": "Architectural seam: skills/llm-worker ↔ skills/llm-worker/agents/openai.yaml",
+      "category": "architectural_seam",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "architecture",
+      "summary": "The dependency between skills/llm-worker and skills/llm-worker/agents/openai.yaml is a bridge (cut-edge): its removal disconnects the two regions. A single load-bearing link is a fragility and refactor risk.",
+      "affected_files": [
+        {
+          "path": "skills/llm-worker"
+        },
+        {
+          "path": "skills/llm-worker/agents/openai.yaml"
+        }
+      ],
+      "systemic": true,
+      "evidence": []
+    },
+    {
+      "id": "ARC-3227f893-7",
+      "title": "Deterministic-fallback 'code-capable' guarantee is not honored when every candidate is on the AVOID list",
+      "category": "invariant_counterexample",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "architecture",
+      "summary": "deterministicFallbackModel (llm-worker.mjs:88) is pinned by a documented contract (INV-WC-DETFALLBACK): never silently return the bootstrap, and pick a CODE-CAPABLE candidate deterministically. The avoid/prefer machinery only filters embedding/vision/etc.; when *every* candidate matches AVOID (e.g. a backend that exposes only embedding/vision/audio model ids), the function deliberately sets pool = sorted (the full avoided set) and, since no PREFER pattern matches, returns pool[0] -- the lexicographically-first embedding/vision model. So the 'code-capable' postcondition the comment promises is violated by construction in that case: the function returns a model it just classified as non-code-capable. This is defensible as 'better than crashing', but the inferred contract ('guarantees gpt-code-xl over ada-embedding-001') overstates what holds. Worse, this fallback value is what nextModel may persist as selected_model (see DR-002). Recommend either documenting that the all-avoided case yields a non-code-capable best-effort pick, or surfacing it as an explicit no-eligible-model error rather than a silent code-capable claim.",
+      "affected_files": [
+        {
+          "path": "llm-worker.mjs"
+        }
+      ],
+      "systemic": false,
+      "grounding": {
+        "status": "grounded"
+      },
+      "evidence": []
+    },
+    {
+      "id": "MNT-aa12e390",
+      "title": "High complexity: bin/llm-worker-tools.mjs",
+      "category": "complexity_hotspot",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "bin/llm-worker-tools.mjs has a duplicate-line-count of 11 (reach: js-ts-effective). Duplicated code multiplies the cost of every future change to that logic.",
+      "affected_files": [
+        {
+          "path": "bin/llm-worker-tools.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "MNT-3227f893",
+      "title": "High complexity: llm-worker.mjs",
+      "category": "complexity_hotspot",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "llm-worker.mjs has a cyclomatic-approx of 121 (reach: js-ts-effective). High structural complexity is hard to test and change safely.",
+      "affected_files": [
+        {
+          "path": "llm-worker.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "MNT-4f12cf70",
+      "title": "High complexity: scripts/env-utils.mjs",
+      "category": "complexity_hotspot",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "scripts/env-utils.mjs has a duplicate-line-count of 1 (reach: js-ts-effective). Duplicated code multiplies the cost of every future change to that logic.",
+      "affected_files": [
+        {
+          "path": "scripts/env-utils.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "MNT-1a6dcc69",
+      "title": "High complexity: scripts/install-ides.mjs",
+      "category": "complexity_hotspot",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "scripts/install-ides.mjs has a duplicate-line-count of 31 (reach: js-ts-effective). Duplicated code multiplies the cost of every future change to that logic.",
+      "affected_files": [
+        {
+          "path": "scripts/install-ides.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "MNT-5ce6946d",
+      "title": "High complexity: scripts/llm-worker-mcp.mjs",
+      "category": "complexity_hotspot",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "scripts/llm-worker-mcp.mjs has a duplicate-line-count of 30 (reach: js-ts-effective). Duplicated code multiplies the cost of every future change to that logic.",
+      "affected_files": [
+        {
+          "path": "scripts/llm-worker-mcp.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "MNT-54b220fe",
+      "title": "High complexity: scripts/validate-plugin.mjs",
+      "category": "complexity_hotspot",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "scripts/validate-plugin.mjs has a duplicate-line-count of 11 (reach: js-ts-effective). Duplicated code multiplies the cost of every future change to that logic.",
+      "affected_files": [
+        {
+          "path": "scripts/validate-plugin.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "MNT-6681fb0c",
+      "title": "High complexity: test/mcp.test.mjs",
+      "category": "complexity_hotspot",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "test/mcp.test.mjs has a cyclomatic-approx of 17 (reach: js-ts-effective). High structural complexity is hard to test and change safely.",
+      "affected_files": [
+        {
+          "path": "test/mcp.test.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "ARC-1a6dcc69-3",
+      "title": "Install/sync/validate responsibilities are smeared across scripts coupled through package.json, making the packaging surface the real complexity center",
+      "category": "structural_risk",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "architecture",
+      "summary": "The genuinely interesting complexity in this repo is not the worker (which is a clean, well-tested single-call function) — it is the packaging/host-integration layer. install-ides.mjs (~310 lines, the highest real branch count after the worker) shells out to sync-host-files.mjs, which is itself a second renderer of the same content (see DR-003), while validate-plugin.mjs independently re-derives the list of files-that-must-exist and runs node --check across them. All three read package.json for the version, which is why the structural graph reports a thicket of \"dependency cycles through package.json\" — those cycles are mostly an artifact of treating a data file as a graph node, but they correctly point at the real issue: version, file manifest, command table, and host list are facts duplicated across package.json `files`, validate-plugin's requiredFiles array, command-metadata's SCRIPT_BY_COMMAND, and the installer/sync renderers, with no single declaration any of them derive from. The shape problem is that \"what this package ships and where it installs\" is encoded four times. A single manifest module that the installer, the sync generator, the validator, and (where possible) package.json all consume would collapse the cycle noise and the drift-policing into ordinary data.",
+      "affected_files": [
+        {
+          "path": "scripts/install-ides.mjs"
+        },
+        {
+          "path": "scripts/validate-plugin.mjs"
+        },
+        {
+          "path": "scripts/command-metadata.mjs"
+        },
+        {
+          "path": "package.json"
+        }
+      ],
+      "systemic": true,
+      "grounding": {
+        "status": "grounded"
+      },
+      "evidence": []
+    },
+    {
+      "id": "REL-3762b68c",
+      "title": "MCP server exits immediately on stdin end/close, dropping in-flight tool calls",
+      "category": "failure-without-recovery",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "reliability",
+      "summary": "stdin `end`/`close` invoke `disconnect()` which calls `process.exit(0)` synchronously. Any `tools/call` whose backend request is still awaiting (`handleMessage` is async and fire-and-forget in parseMessages) is terminated without a response, so a client that closed its write side after sending a request gets no reply and no error.",
+      "affected_files": [
+        {
+          "path": "scripts/llm-worker-mcp.mjs",
+          "line_start": 263,
+          "line_end": 278,
+          "symbol": "startServer",
+          "quoted_text": "const disconnect = () => {\n    if (disconnecting) return;\n    disconnecting = true;\n    process.exit(0);\n  };"
+        },
+        {
+          "path": "scripts/llm-worker-mcp.mjs",
+          "line_start": 170,
+          "line_end": 174,
+          "symbol": "parseMessages",
+          "quoted_text": "handleMessage(message, { stdout }).catch(error => {"
+        }
+      ],
+      "evidence": [
+        "scripts/llm-worker-mcp.mjs:267 - disconnect calls process.exit(0) with no drain of pending async tool calls.",
+        "scripts/llm-worker-mcp.mjs:170 - handleMessage is invoked without awaiting, so a long-running tools/call can still be pending when stdin closes."
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    },
+    {
+      "id": "ARC-3227f893-8",
+      "title": "No verification seam for advisory output despite every doc insisting the output must be verified",
+      "category": "missing_capability",
+      "severity": "medium",
+      "confidence": "medium",
+      "lens": "architecture",
+      "summary": "The design's most-repeated user-facing rule is \"output is advisory — verify before acting\" (README, CLAUDE.md, ambient-agent-policy.md, and the MCP tool descriptions all say it). Yet the system provides no machine-readable signal to support that verification: the worker returns the same opaque JSON shape whether it answered from rich context or hallucinated, and parseWorkerJson only validates structural conformance to the read/write schema, never provenance or confidence. For a tool whose entire safety story rests on the consumer distrusting the result, the absence of any confidence/grounding field, source-attribution, or \"insufficient context\" sentinel is a missing capability that is cheap now and expensive later — once agents are wired to act on this output ambiently, there is nothing in the contract that lets a caller distinguish a strong answer from a weak one. The read schema already carries `open_questions`; promoting that into a first-class confidence/grounding signal (and having the system surface when the model declined or guessed) would make the advisory contract enforceable instead of merely asserted in prose.",
+      "affected_files": [
+        {
+          "path": "llm-worker.mjs"
+        },
+        {
+          "path": "shared/ambient-agent-policy.md"
+        }
+      ],
+      "systemic": true,
+      "grounding": {
+        "status": "grounded"
+      },
+      "evidence": []
+    },
+    {
+      "id": "MNT-381320ce",
+      "title": "Package name and version duplicated between plugin.json and package.json",
+      "category": "duplicated-source-of-truth",
+      "severity": "low",
+      "confidence": "high",
+      "lens": "maintainability",
+      "summary": "The name \"llm-worker-tools\" and version \"0.2.2\" are hard-coded here and also live in the root package.json, so every release bump must be edited in two places to stay consistent with no shared source.",
+      "affected_files": [
+        {
+          "path": ".codex-plugin/plugin.json",
+          "line_start": 2,
+          "line_end": 3,
+          "quoted_text": "\"name\": \"llm-worker-tools\",\n  \"version\": \"0.2.2\","
+        },
+        {
+          "path": "package.json",
+          "line_start": 2,
+          "line_end": 3,
+          "quoted_text": "\"name\": \"llm-worker-tools\",\n  \"version\": \"0.2.2\","
+        }
+      ],
+      "evidence": [
+        ".codex-plugin/plugin.json:2-3 - declares name/version literals that mirror the npm package manifest",
+        "package.json:2-3 - same name and version, the canonical manifest; the two must be kept in lockstep by convention on each release"
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    },
+    {
+      "id": "ARC-381320ce",
+      "title": "3 orphan unit(s) with no graph connections",
+      "category": "orphan_units",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "architecture",
+      "summary": "Units [-codex-plugin, -remediation-artifacts, -vscode] have no import, call, or reference edges in the dependency graph. They may be dead code, or the graph extraction missed their connections.",
+      "affected_files": [
+        {
+          "path": ".codex-plugin/plugin.json"
+        },
+        {
+          "path": ".remediation-artifacts/run.log.jsonl"
+        },
+        {
+          "path": ".vscode/mcp.json"
+        }
+      ],
+      "systemic": true,
+      "evidence": []
+    },
+    {
+      "id": "COR-5c06c147",
+      "title": "Bare 'audit-code' allow prefix contradicts claimed remediation",
+      "category": "incorrect-configuration",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "correctness",
+      "summary": "remediation-report.json FINDING-057 claims the bare 'audit-code' permission prefix was reconciled with the full invocation path, but opencode.json still grants a bare 'audit-code': 'allow' prefix, which allows any argument string beginning with that token (e.g. denied subcommands invoked via paths the deny patterns do not cover).",
+      "affected_files": [
+        {
+          "path": "opencode.json",
+          "line_start": 31,
+          "line_end": 31,
+          "quoted_text": "\"audit-code\": \"allow\","
+        },
+        {
+          "path": "remediation-report.json",
+          "line_start": 209,
+          "line_end": 211,
+          "quoted_text": "the bare 'audit-code' permission prefix has been reconciled with the full invocation path"
+        }
+      ],
+      "evidence": [
+        "opencode.json:31 - bare 'audit-code': 'allow' broad prefix still present (also duplicated at line 83 under agent.auditor)",
+        "remediation-report.json:211 - FINDING-057 asserts the bare prefix was reconciled with the full invocation path, contradicting the live config"
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    },
+    {
+      "id": "TST-199e7cda",
+      "title": "bin dispatch signal-forwarding branch is untested",
+      "category": "coverage-gap",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "tests",
+      "summary": "bin.test.mjs covers exit-code, error, and ordering paths but never exercises the child `exit` handler's signal branch (code null + signal -> process.kill), leaving the signal re-raise logic unverified.",
+      "affected_files": [
+        {
+          "path": "bin/llm-worker-tools.mjs",
+          "line_start": 51,
+          "line_end": 59,
+          "symbol": "dispatch",
+          "quoted_text": "if (signal) {\n      process.kill(process.pid, signal);\n      return;\n    }"
+        }
+      ],
+      "evidence": [
+        "bin/llm-worker-tools.mjs:55 - the signal-forwarding branch has no corresponding emit('exit', null, signal) test in test/bin.test.mjs."
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    },
+    {
+      "id": "MNT-3227f893-2",
+      "title": "Duplicated code: llm-worker.mjs",
+      "category": "code_duplication",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "llm-worker.mjs has a duplicate-line-count of 54 (reach: js-ts-effective). Duplicated code multiplies the cost of every future change to that logic.",
+      "affected_files": [
+        {
+          "path": "llm-worker.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "MNT-f21883ee",
+      "title": "Duplicated code: scripts/sync-host-files.mjs",
+      "category": "code_duplication",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "scripts/sync-host-files.mjs has a duplicate-line-count of 29 (reach: js-ts-effective). Duplicated code multiplies the cost of every future change to that logic.",
+      "affected_files": [
+        {
+          "path": "scripts/sync-host-files.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "MNT-20d326d9",
+      "title": "Duplicated code: test/bin.test.mjs",
+      "category": "code_duplication",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "test/bin.test.mjs has a duplicate-line-count of 56 (reach: js-ts-effective). Duplicated code multiplies the cost of every future change to that logic.",
+      "affected_files": [
+        {
+          "path": "test/bin.test.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "MNT-6e34dce5",
+      "title": "Duplicated code: test/config.test.mjs",
+      "category": "code_duplication",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "test/config.test.mjs has a duplicate-line-count of 3 (reach: js-ts-effective). Duplicated code multiplies the cost of every future change to that logic.",
+      "affected_files": [
+        {
+          "path": "test/config.test.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "MNT-695ef56d",
+      "title": "Duplicated code: test/deterministic-fallback.test.mjs",
+      "category": "code_duplication",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "test/deterministic-fallback.test.mjs has a duplicate-line-count of 10 (reach: js-ts-effective). Duplicated code multiplies the cost of every future change to that logic.",
+      "affected_files": [
+        {
+          "path": "test/deterministic-fallback.test.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "MNT-e59361cd",
+      "title": "Duplicated code: test/env-utils.test.mjs",
+      "category": "code_duplication",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "test/env-utils.test.mjs has a duplicate-line-count of 6 (reach: js-ts-effective). Duplicated code multiplies the cost of every future change to that logic.",
+      "affected_files": [
+        {
+          "path": "test/env-utils.test.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "MNT-624dcc45",
+      "title": "Duplicated code: test/llm-worker.test.mjs",
+      "category": "code_duplication",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "test/llm-worker.test.mjs has a duplicate-line-count of 47 (reach: js-ts-effective). Duplicated code multiplies the cost of every future change to that logic.",
+      "affected_files": [
+        {
+          "path": "test/llm-worker.test.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "MNT-6681fb0c-2",
+      "title": "Duplicated code: test/mcp.test.mjs",
+      "category": "code_duplication",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "test/mcp.test.mjs has a duplicate-line-count of 38 (reach: js-ts-effective). Duplicated code multiplies the cost of every future change to that logic.",
+      "affected_files": [
+        {
+          "path": "test/mcp.test.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": []
+    },
+    {
+      "id": "MNT-7e2baffd",
+      "title": "Duplicated code: test/model-fallback.test.mjs",
+      "category": "code_duplication",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "test/model-fallback.test.mjs has a duplicate-line-count of 11 (reach: js-ts-effective). Duplicated code multiplies the cost of every future change to that logic.",
+      "affected_files": [
+        {
+          "path": "test/model-fallback.test.mjs"
+        }
+      ],
+      "systemic": false,
+      "evidence": [
+        "runtime:unit:tests-model-fallback-test-mjs: confirmed — Deterministic runtime command succeeded: npm test"
+      ]
+    },
+    {
+      "id": "ARC-4f12cf70-3",
+      "title": "loadUserEnv 'undefined-only' merge lets a process-level empty string shadow the configured .env value",
+      "category": "inferred_contract_gap",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "architecture",
+      "summary": "Two adjacent contracts in env-utils.mjs interact badly. (1) parseEnv/formatEnv document that the empty string is intentionally OUTSIDE the round-trip domain -- empty values do not persist (env-utils.mjs:25-27,88-103). (2) loadUserEnv only injects a parsed key when process.env[key] === undefined (env-utils.mjs:84), i.e. an env var explicitly present but set to '' is treated as 'already provided' and the .env value is suppressed. Counterexample: a launcher (or a stale shell) that exports LLM_BACKEND_BASE_URL= (empty) causes loadUserEnv to skip the configured non-empty base URL from ~/.llm-worker-tools/.env, and assertConfig then dies with 'Missing LLM_BACKEND_BASE_URL' even though the file holds a valid value. The precondition 'an empty env var means unset, defer to file' is implied by the empty-string-is-non-persisting policy but is not honored by the undefined-only guard. Recommend treating empty string as absent in loadUserEnv (or documenting that empty process env vars are authoritative and override file config).",
+      "affected_files": [
+        {
+          "path": "scripts/env-utils.mjs"
+        },
+        {
+          "path": "llm-worker.mjs"
+        }
+      ],
+      "systemic": false,
+      "grounding": {
+        "status": "grounded"
+      },
+      "evidence": []
+    },
+    {
+      "id": "TST-039ba4e1",
+      "title": "MCP error-response paths (tools/call failure, unknown method) lack coverage",
+      "category": "coverage-gap",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "tests",
+      "summary": "mcp.test.mjs asserts initialize, tools/list, callTool validation, and parser framing, but no test drives handleMessage through a tools/call that throws (isError content) or through the unknown-method -32601 reply branch.",
+      "affected_files": [
+        {
+          "path": "scripts/llm-worker-mcp.mjs",
+          "line_start": 243,
+          "line_end": 259,
+          "symbol": "handleMessage",
+          "quoted_text": "send({\n        jsonrpc: \"2.0\",\n        id: message.id,\n        result: { isError: true, content: [{ type: \"text\", text: error.message }] }\n      }, stdout);"
+        }
+      ],
+      "evidence": [
+        "scripts/llm-worker-mcp.mjs:246 - the tools/call isError response branch and the unknown-method -32601 branch at line 259 are not asserted by any mcp test."
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    },
+    {
+      "id": "ARC-a41851b5-2",
+      "title": "Module dependency graph closes a cycle through package.json, coupling runtime code to a data artifact",
+      "category": "inferred_contract_gap",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "architecture",
+      "summary": "The deterministic pass flags multiple import cycles, the largest (high severity) running bin/llm-worker-tools.mjs -> scripts/command-metadata.mjs -> scripts/env-utils.mjs -> scripts/install-ides.mjs -> scripts/llm-worker-mcp.mjs -> package.json -> scripts/sync-host-files.mjs -> scripts/validate-plugin.mjs -> back. The implied layering contract is that command-metadata/env-utils are low-level leaves that higher-level scripts depend on, not vice versa; the cycle shows that boundary is not enforced. llm-worker-mcp.mjs reaches package.json only via createRequire(...)('../package.json') for the version string (scripts/llm-worker-mcp.mjs:12), so the cycle is partly an artifact of treating a JSON data file as a graph node, but the script-to-script edges through install-ides/sync-host-files/validate-plugin are real and make initialization order and isolated unit testing harder. Recommend extracting the shared low-level constants (command metadata, version) into a dependency-free leaf module that the higher-level scripts import one-directionally, breaking the script-level cycle.",
+      "affected_files": [
+        {
+          "path": "scripts/command-metadata.mjs"
+        },
+        {
+          "path": "scripts/env-utils.mjs"
+        },
+        {
+          "path": "scripts/install-ides.mjs"
+        },
+        {
+          "path": "scripts/llm-worker-mcp.mjs"
+        }
+      ],
+      "systemic": true,
+      "grounding": {
+        "status": "grounded"
+      },
+      "evidence": []
+    },
+    {
+      "id": "MNT-85422ee8",
+      "title": "OpenAI-compatible HTTP backend stub duplicated across mcp.test.mjs and model-fallback.test.mjs",
+      "category": "duplicated-logic",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "maintainability",
+      "summary": "Both test files independently implement a near-identical local http server stub (sendJson helper, GET /v1/models, POST /v1/chat/completions with selection-vs-worker branching). The shared backend contract is kept consistent by convention; a backend protocol change requires editing both copies.",
+      "affected_files": [
+        {
+          "path": "test/mcp.test.mjs",
+          "line_start": 20,
+          "line_end": 56,
+          "symbol": "startBackend",
+          "quoted_text": "function startBackend() {\n  const server = http.createServer((req, res) => {\n    const sendJson = (status, body) => {"
+        },
+        {
+          "path": "test/model-fallback.test.mjs",
+          "line_start": 19,
+          "line_end": 74,
+          "symbol": "startServer",
+          "quoted_text": "function startServer(hits) {\n  const models = [\"model-1\", \"model-2\"];\n  const server = http.createServer((req, res) => {"
+        }
+      ],
+      "evidence": [
+        "test/mcp.test.mjs:20 - startBackend builds an OpenAI-compatible http stub with /v1/models and /v1/chat/completions handlers.",
+        "test/model-fallback.test.mjs:19 - startServer reimplements the same stub shape; the two should single-source the backend fixture.",
+        "runtime:unit:tests-model-fallback-test-mjs: confirmed — Deterministic runtime command succeeded: npm test"
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    },
+    {
+      "id": "COR-3ae76802",
+      "title": "runNodeScript exits 1 on signal termination by treating null status as success-or-one",
+      "category": "misuse-of-api",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "correctness",
+      "summary": "When the spawned sync script is killed by a signal, spawnSync returns status null; `result.status !== 0` is true so it exits, but `result.status || 1` yields 1, masking the actual signal cause. Acceptable for a hard-fail install gate but loses the signal distinction.",
+      "affected_files": [
+        {
+          "path": "scripts/install-ides.mjs",
+          "line_start": 76,
+          "line_end": 82,
+          "symbol": "runNodeScript",
+          "quoted_text": "if (result.status !== 0) process.exit(result.status || 1);"
+        }
+      ],
+      "evidence": [
+        "scripts/install-ides.mjs:81 - signal-killed child (status null) collapses to exit code 1 with no signal-based handling."
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    },
+    {
+      "id": "TST-20d326d9",
+      "title": "Several tests are drift guards policing host-file / metadata duplication instead of single-sourced logic",
+      "category": "drift-guard",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "tests",
+      "summary": "bin.test.mjs sources the usage 'read' line from metadata to avoid a literal duplicate, and config.test.mjs derives npx args from package name + command metadata, explicitly to keep two copies aligned. These are workarounds for format/contract duplicated between source and generated host files; the underlying duplication (single-sourced by sync-host-files plus tests) is the real smell.",
+      "affected_files": [
+        {
+          "path": "test/bin.test.mjs",
+          "line_start": 7,
+          "line_end": 12,
+          "quoted_text": "const READ_USAGE_LINE = usageText()\n  .split(\"\\n\")\n  .find(line => /\\bread\\b/.test(line));"
+        },
+        {
+          "path": "test/config.test.mjs",
+          "line_start": 29,
+          "line_end": 34,
+          "quoted_text": "const expectedArgs = [\"--yes\", packageName, \"mcp\"];"
+        }
+      ],
+      "evidence": [
+        "test/bin.test.mjs:10 - test deliberately re-derives the read usage line from metadata to keep a drift guard from drifting, signalling duplicated banner content.",
+        "test/config.test.mjs:31 - expected npx args are reconstructed from package name + command metadata to police drift against the generated .vscode/mcp.json."
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    },
+    {
+      "id": "ARC-3227f893-9",
+      "title": "Single-retry timeout contract is reported against a model that may have changed mid-flight",
+      "category": "inferred_contract_gap",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "architecture",
+      "summary": "runWorker's timeout contract (llm-worker.mjs:401-438) is 'time out, back off once, double the budget, retry exactly once, then fail with a message naming the verb and model'. Inside a single timeout window the inner loop can swap `model` via nextModel on a 404 (llm-worker.mjs:423). If the *second* (doubled-budget) attempt then times out, timeoutMessage(activeTimeoutMs, verb, model) (llm-worker.mjs:432) reports whatever model was current when the abort fired -- which may be a 404-recovery substitute, not the model the user/cache selected, and the `tried` set carried across the retry means the doubled attempt may also begin on a different model than the first. The observability contract ('the failing model is identified') is therefore only loosely true under concurrent 404 fallback. This is diagnostic-quality, not a correctness break, but worth either pinning the reported model to the originally-resolved one or enumerating the tried set in the timeout message.",
+      "affected_files": [
+        {
+          "path": "llm-worker.mjs"
+        }
+      ],
+      "systemic": false,
+      "grounding": {
+        "status": "grounded"
+      },
+      "evidence": []
+    },
+    {
+      "id": "CFG-a2c197c9",
+      "title": "workflow_dispatch publish guard hardcodes refs/heads/main alongside the dynamic default-branch check",
+      "category": "ci-config",
+      "severity": "low",
+      "confidence": "medium",
+      "lens": "config_deployment",
+      "summary": "The dispatch branch of the `if` requires both `github.ref_name == default_branch` AND `github.ref == 'refs/heads/main'`. The literal `refs/heads/main` is redundant with the dynamic default-branch comparison and would silently block dispatch publishes if the default branch is ever renamed.",
+      "affected_files": [
+        {
+          "path": ".github/workflows/publish.yml",
+          "line_start": 15,
+          "line_end": 19,
+          "quoted_text": "(github.event_name == 'workflow_dispatch' &&\n        github.ref_name == github.event.repository.default_branch &&\n        github.ref == 'refs/heads/main')"
+        }
+      ],
+      "evidence": [
+        ".github/workflows/publish.yml:18 - both a dynamic default-branch check and a hardcoded refs/heads/main check gate the dispatch publish, coupling the workflow to the literal branch name."
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    },
+    {
+      "id": "COR-c5ab8ad0",
+      "title": "Model 404 rotation loses the timeout-retry budget by sharing the tried set across retries",
+      "category": "incorrect-state-transition",
+      "severity": "low",
+      "confidence": "low",
+      "lens": "correctness",
+      "summary": "On a timeout the outer loop restarts the inner attempt loop, but the shared `tried` set already contains every model the previous attempt rotated through via 404, so a post-timeout retry can immediately hit `nextModel` exhaustion logic on models it never actually re-probed.",
+      "affected_files": [
+        {
+          "path": "llm-worker.mjs",
+          "line_start": 397,
+          "line_end": 438,
+          "symbol": "runWorker",
+          "quoted_text": "const tried = new Set();\n  let timedOutOnce = false;\n  let activeTimeoutMs = timeoutMs;"
+        }
+      ],
+      "evidence": [
+        "llm-worker.mjs:397 - `tried` is declared once outside the timeout-retry `for(;;)` loop and is never reset on the single retry, so models marked tried before a timeout remain excluded on the retry pass."
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    },
+    {
+      "id": "TST-441aad81",
+      "title": "No test covers the cache-reuse fast path in refreshCache",
+      "category": "coverage-gap",
+      "severity": "low",
+      "confidence": "low",
+      "lens": "tests",
+      "summary": "refreshCache has a non-force branch that reuses an existing selected_model when the model set is unchanged (setsEqual), skipping selectBestModel. Tests exercise selection and rotation but not this reuse short-circuit, so a regression that re-selects unnecessarily would pass.",
+      "affected_files": [
+        {
+          "path": "llm-worker.mjs",
+          "line_start": 283,
+          "line_end": 287,
+          "symbol": "refreshCache",
+          "quoted_text": "if (!force && existing?.selected_model && models.includes(existing.selected_model) && setsEqual(existing.models || [], models)) {"
+        }
+      ],
+      "evidence": [
+        "llm-worker.mjs:283 - the unchanged-model-set reuse branch in refreshCache is not asserted by any test in the packet."
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    },
+    {
+      "id": "REL-c5ab8ad0",
+      "title": "Worker network calls rely solely on AbortController timeout with no per-request retry on transient non-timeout failures",
+      "category": "missing-retry",
+      "severity": "low",
+      "confidence": "low",
+      "lens": "reliability",
+      "summary": "In runWorker, the only recovery paths are a single timeout retry (AbortError) and 404-based model rotation. Transient network/server errors (ECONNRESET, ETIMEDOUT socket errors, 5xx, 429) are rethrown immediately with no per-request retry or backoff, so a single transient backend hiccup fails the whole invocation.",
+      "affected_files": [
+        {
+          "path": "llm-worker.mjs",
+          "line_start": 420,
+          "line_end": 427,
+          "symbol": "runWorker",
+          "quoted_text": "if (!modelOverride && is404(err)) {\n              logger(`Model \"${model}\" returned 404.`);\n              model = await nextModel(activeClient, tried, { config, signal, logger, cachePath, fsModule });\n              continue;\n            }\n            throw err;"
+        }
+      ],
+      "evidence": [
+        "llm-worker.mjs:426 - only 404 errors are recovered inside the attempt loop; all other errors (including transient 5xx/socket resets) are rethrown without retry.",
+        "llm-worker.mjs:420-427 - inner catch only rotates on is404(err); every other error (including transient 5xx/429/socket resets) is rethrown with no retry",
+        "llm-worker.mjs:430-437 - outer catch retries only AbortError (timeout) exactly once, confirming transient non-timeout failures get zero retry"
+      ],
+      "grounding": {
+        "status": "grounded"
+      },
+      "systemic": false
+    },
+    {
+      "id": "TST-695ef56d",
+      "title": "deterministicFallbackModel comment-only assertion of avoided-id sort order is fragile",
+      "category": "fragile-test",
+      "severity": "info",
+      "confidence": "low",
+      "lens": "tests",
+      "summary": "The all-avoided test asserts the lexicographically-first embedding id is returned, with sort behavior documented only in a comment; if AVOID patterns change the test silently shifts meaning rather than failing loudly.",
+      "affected_files": [
+        {
+          "path": "test/deterministic-fallback.test.mjs",
+          "line_start": 50,
+          "line_end": 56,
+          "quoted_text": "const models = [\"text-embedding-3-large\", \"text-embedding-3-small\"];"
+        }
+      ],
+      "evidence": [
+        "test/deterministic-fallback.test.mjs:54 - the expected pick is justified by a `// sorted:` comment rather than an explicit invariant, making the assertion easy to misread on change."
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    },
+    {
+      "id": "MNT-b9d605bb",
+      "title": "MCP wire-framing reimplemented in test instead of single-sourced",
+      "category": "duplicated-logic",
+      "severity": "info",
+      "confidence": "low",
+      "lens": "maintainability",
+      "summary": "test/mcp.test.mjs hand-rolls the LSP-style Content-Length framing in framed() and decodes it in parseFramedResponses(), duplicating the exact frame format produced by send() in scripts/llm-worker-mcp.mjs. The format contract lives in two places, so any change to the header/encoding must be edited in both to stay correct.",
+      "affected_files": [
+        {
+          "path": "test/mcp.test.mjs",
+          "line_start": 58,
+          "line_end": 61,
+          "symbol": "framed",
+          "quoted_text": "function framed(message) {\n  const json = JSON.stringify(message);\n  return `Content-Length: ${Buffer.byteLength(json, \"utf8\")}\\r\\n\\r\\n${json}`;\n}"
+        },
+        {
+          "path": "scripts/llm-worker-mcp.mjs",
+          "line_start": 65,
+          "line_end": 68,
+          "symbol": "send",
+          "quoted_text": "export function send(message, stdout = process.stdout) {\n  const json = JSON.stringify(message);\n  stdout.write(`Content-Length: ${Buffer.byteLength(json, \"utf8\")}\\r\\n\\r\\n${json}`);\n}"
+        }
+      ],
+      "evidence": [
+        "test/mcp.test.mjs:58-61 - framed() reimplements the Content-Length frame format byte-for-byte",
+        "scripts/llm-worker-mcp.mjs:65-68 - send() is the production source of that same frame format; the two are kept consistent only by convention",
+        "test/mcp.test.mjs:71-83 - parseFramedResponses() reimplements the decode side of the same contract"
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    },
+    {
+      "id": "MNT-b9d605bb-2",
+      "title": "parseFramedResponses / framed MCP framing helpers duplicate the wire format under test",
+      "category": "duplicated-logic",
+      "severity": "info",
+      "confidence": "low",
+      "lens": "maintainability",
+      "summary": "test/mcp.test.mjs reimplements Content-Length framing and parsing inline (framed, parseFramedResponses) rather than reusing the production `send`/parser, so the framing contract lives in two places kept aligned by hand.",
+      "affected_files": [
+        {
+          "path": "test/mcp.test.mjs",
+          "line_start": 58,
+          "line_end": 83,
+          "symbol": "framed",
+          "quoted_text": "function framed(message) {\n  const json = JSON.stringify(message);\n  return `Content-Length: ${Buffer.byteLength(json, \"utf8\")}\\r\\n\\r\\n${json}`;\n}"
+        }
+      ],
+      "evidence": [
+        "test/mcp.test.mjs:58 - framed() hand-rolls the Content-Length envelope that production send() already emits."
+      ],
+      "grounding": {
+        "status": "grounded"
+      }
+    }
+  ],
+  "work_blocks": [
+    {
+      "id": "block-1",
+      "finding_ids": [
+        "ARC-1a6dcc69",
+        "ARC-1a6dcc69-2",
+        "ARC-3227f893",
+        "ARC-3227f893-2",
+        "ARC-3227f893-3",
+        "ARC-a41851b5",
+        "ARC-aa12e390",
+        "ARC-1a6dcc69-3",
+        "ARC-3227f893-4",
+        "ARC-3227f893-5",
+        "ARC-3227f893-6",
+        "ARC-3227f893-7",
+        "ARC-3227f893-8",
+        "ARC-4f12cf70",
+        "ARC-4f12cf70-2",
+        "ARC-5ce6946d",
+        "ARC-aa12e390-2",
+        "ARC-eaffc6ab",
+        "ARC-f833f9fb",
+        "MNT-1a6dcc69",
+        "MNT-3227f893",
+        "MNT-4f12cf70",
+        "MNT-54b220fe",
+        "MNT-5ce6946d",
+        "MNT-6681fb0c",
+        "MNT-6d8cf619",
+        "MNT-aa12e390",
+        "REL-3762b68c",
+        "ARC-3227f893-9",
+        "ARC-381320ce",
+        "ARC-4f12cf70-3",
+        "ARC-a41851b5-2",
+        "COR-3ae76802",
+        "COR-5c06c147",
+        "COR-c5ab8ad0",
+        "MNT-3227f893-2",
+        "MNT-381320ce",
+        "MNT-624dcc45",
+        "MNT-6681fb0c-2",
+        "MNT-695ef56d",
+        "MNT-7e2baffd",
+        "MNT-85422ee8",
+        "MNT-e59361cd",
+        "MNT-f21883ee",
+        "REL-c5ab8ad0",
+        "TST-039ba4e1",
+        "TST-199e7cda",
+        "TST-441aad81",
+        "MNT-b9d605bb",
+        "MNT-b9d605bb-2",
+        "TST-695ef56d"
+      ],
+      "unit_ids": [
+        "-codex-plugin",
+        "-remediation-artifacts",
+        "-vscode",
+        "bin",
+        "file:README.md",
+        "file:shared/ambient-agent-policy.md",
+        "file:skills/llm-worker",
+        "module-llm-worker-mjs",
+        "root-config",
+        "scripts",
+        "skills-llm-worker",
+        "tests-deterministic-fallback-test-mjs",
+        "tests-env-utils-test-mjs",
+        "tests-llm-worker-test-mjs",
+        "tests-mcp-test-mjs",
+        "tests-model-fallback-test-mjs"
+      ],
+      "owned_files": [
+        ".codex-plugin/plugin.json",
+        ".remediation-artifacts/run.log.jsonl",
+        ".vscode/mcp.json",
+        "README.md",
+        "bin/llm-worker-tools.mjs",
+        "llm-worker.mjs",
+        "opencode.json",
+        "package.json",
+        "remediation-report.json",
+        "scripts/command-metadata.mjs",
+        "scripts/env-utils.mjs",
+        "scripts/install-ides.mjs",
+        "scripts/llm-worker-mcp.mjs",
+        "scripts/sync-host-files.mjs",
+        "scripts/validate-plugin.mjs",
+        "shared/ambient-agent-policy.md",
+        "skills/llm-worker",
+        "skills/llm-worker/agents/openai.yaml",
+        "test/deterministic-fallback.test.mjs",
+        "test/env-utils.test.mjs",
+        "test/llm-worker.test.mjs",
+        "test/mcp.test.mjs",
+        "test/model-fallback.test.mjs"
+      ],
+      "max_severity": "high",
+      "rationale": "Findings share owned units transitively and should remain one non-overlapping remediation block.",
+      "depends_on": []
+    },
+    {
+      "id": "block-2",
+      "finding_ids": [
+        "ARC-63c8b5a8",
+        "CFG-a2c197c9"
+      ],
+      "unit_ids": [
+        "-github-workflows",
+        "file:.github/workflows"
+      ],
+      "owned_files": [
+        ".github/workflows",
+        ".github/workflows/publish.yml"
+      ],
+      "max_severity": "medium",
+      "rationale": "Findings share owned units transitively and should remain one non-overlapping remediation block.",
+      "depends_on": [
+        "block-1"
+      ]
+    },
+    {
+      "id": "block-3",
+      "finding_ids": [
+        "ARC-34b93d00"
+      ],
+      "unit_ids": [
+        "-gemini-commands",
+        "file:.gemini/commands"
+      ],
+      "owned_files": [
+        ".gemini/commands",
+        ".gemini/commands/audit-code.toml"
+      ],
+      "max_severity": "medium",
+      "rationale": "Findings share owned units transitively and should remain one non-overlapping remediation block.",
+      "depends_on": []
+    },
+    {
+      "id": "block-4",
+      "finding_ids": [
+        "ARC-94320dff"
+      ],
+      "unit_ids": [
+        "-remediation-artifacts-steps",
+        "file:.remediation-artifacts/steps"
+      ],
+      "owned_files": [
+        ".remediation-artifacts/steps",
+        ".remediation-artifacts/steps/current-step.json"
+      ],
+      "max_severity": "medium",
+      "rationale": "Findings share owned units transitively and should remain one non-overlapping remediation block.",
+      "depends_on": []
+    },
+    {
+      "id": "block-5",
+      "finding_ids": [
+        "MNT-20d326d9",
+        "MNT-6e34dce5",
+        "TST-20d326d9"
+      ],
+      "unit_ids": [
+        "tests-bin-test-mjs",
+        "tests-config-test-mjs"
+      ],
+      "owned_files": [
+        "test/bin.test.mjs",
+        "test/config.test.mjs"
+      ],
+      "max_severity": "low",
+      "rationale": "Findings share owned units transitively and should remain one non-overlapping remediation block.",
+      "depends_on": [
+        "block-1"
+      ]
+    }
+  ]
+}

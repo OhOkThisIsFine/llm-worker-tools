@@ -4,7 +4,10 @@ node_modules/
 *.log
 
 # audit-tools / audit-code local run + install scratch (not part of the package)
-.audit-tools/
+# Ignore the run/scratch contents but keep the final audit deliverables tracked.
+.audit-tools/*
+!.audit-tools/audit-report.md
+!.audit-tools/audit-findings.json
 .audit-code/
 .agent/skills/audit-code/
 .github/agents/
