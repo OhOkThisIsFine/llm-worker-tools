@@ -2,3 +2,7 @@ node_modules/
 .env
 .llm-worker-input.txt
 *.log
+
+# audit-tools / audit-code local run + install scratch (not part of the package)
+.audit-tools/
+.audit-code/
