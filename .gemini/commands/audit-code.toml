@@ -18,13 +18,11 @@ First, make sure the repository has current local audit assets:
 audit-code ensure --quiet
 ```
 
-When developing `auditor-lambda` itself, the entrypoint lives at
-`packages/audit-code/audit-code.mjs` (there is no `audit-code.mjs` at the
-monorepo root). From the monorepo root use:
-
-```bash
-node packages/audit-code/audit-code.mjs ensure --quiet
-```
+When developing `audit-tools` itself, the entrypoint lives at
+`audit-code.mjs` (at the repo root): from the repo root substitute
+`node audit-code.mjs <command>` for `audit-code <command>` throughout this
+loader (e.g. `node audit-code.mjs ensure --quiet`, and likewise for
+`next-step` with the same capability flags shown below).
 
 Then ask the backend for exactly one next step. This is also the **capability
 handshake**: report what you can dispatch to *right now* on every `next-step`
@@ -36,7 +34,7 @@ conservative 32k floor. Report:
   dispatch and sizes waves to one packet at a time.
 - `--host-models` — an ordered JSON array (lowest rank first) of the models you
   can dispatch subagents to *right now*, one entry per relative rank:
-  `{"rank": "small"|"standard"|"deep", "context_tokens": N, "output_tokens": N}`.
+  `{\"rank\": \"small\"|\"standard\"|\"deep\", \"context_tokens\": N, \"output_tokens\": N}`.
   Ranks are relative capability labels that line up with each packet's
   `model_hint.tier` — never report model names to the backend. Report only ranks
   you can actually dispatch to; the backend partitions and budgets each packet
@@ -51,7 +49,7 @@ conservative 32k floor. Report:
   dispatch falls back to the conservative 32k default (many tiny packets).
 
 ```bash
-audit-code next-step --host-max-active-subagents 4 --host-models '[{"rank":"small","context_tokens":32000,"output_tokens":8000},{"rank":"standard","context_tokens":200000,"output_tokens":32000},{"rank":"deep","context_tokens":200000,"output_tokens":64000}]'
+audit-code next-step --host-max-active-subagents 4 --host-models '[{\"rank\":\"small\",\"context_tokens\":32000,\"output_tokens\":8000},{\"rank\":\"standard\",\"context_tokens\":200000,\"output_tokens\":32000},{\"rank\":\"deep\",\"context_tokens\":200000,\"output_tokens\":64000}]'
 ```
 
 Or with a single dispatch model:
@@ -65,12 +63,6 @@ lower it under rate-limit pressure. The backend's learned quota adapts from
 there. The token values should match the window of the model(s) dispatching the
 packets (e.g. 200000 / 32000 for a 200k-context model).
 
-When developing `auditor-lambda` itself, from the monorepo root use:
-
-```bash
-node packages/audit-code/audit-code.mjs next-step --host-max-active-subagents 4 --host-context-tokens 200000 --host-output-tokens 32000
-```
-
 Read the returned JSON only far enough to find `prompt_path`, then read and
 follow only that prompt. Do not read packet prompts, schemas, command catalogs,
 or handoff files unless the current step prompt explicitly instructs you to do
@@ -80,7 +72,7 @@ If the returned step is a dispatch step, before launching subagents check
 `progress.confirmation_recommended` in `steps/current-step.json`:
 
 - If `progress.confirmation_recommended` is `true`, pause and ask the user:
-  "Ready to launch **{progress.dispatch_summary}** — continue?"
+  \"Ready to launch **{progress.dispatch_summary}** — continue?\"
   Wait for an affirmative reply before proceeding with subagent dispatch.
 - If `progress.confirmation_recommended` is `false` (or absent), proceed
   immediately.

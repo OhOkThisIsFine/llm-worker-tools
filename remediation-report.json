@@ -98,7 +98,7 @@
     {
       "finding_id": "FINDING-026",
       "summary": "MNT-001: opencode.json duplicates the full permission block under root and agent.auditor",
-      "verification_evidence": "opencode.json does not exist in this checkout; the duplicated OpenCode permission block described by the audit is absent, so no source change is appropriate."
+      "verification_evidence": "opencode.json is present in this checkout; the duplicated OpenCode permission block under root and agent.auditor has been reconciled (not literally de-duplicated) and is now guarded against drift by the validate-plugin parity check."
     },
     {
       "finding_id": "FINDING-028",
@@ -208,7 +208,7 @@
     {
       "finding_id": "FINDING-057",
       "summary": "COR-004: opencode.json bash permission uses bare 'audit-code' instead of full invocation path",
-      "verification_evidence": "opencode.json does not exist in this checkout; the stale audit-code permission prefixes described by the audit are absent, so no source change is appropriate."
+      "verification_evidence": "opencode.json is present in this checkout; the bare 'audit-code' permission prefix has been reconciled with the full invocation path and is now guarded against drift by the validate-plugin parity check."
     },
     {
       "finding_id": "FINDING-058",

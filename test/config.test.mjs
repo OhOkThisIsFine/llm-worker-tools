@@ -1,13 +1,21 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import test from "node:test";
+import { SCRIPT_BY_COMMAND } from "../scripts/command-metadata.mjs";
+
+const { name: packageName } = createRequire(import.meta.url)("../package.json");
 
 test("plugin manifest uses canonical project URLs and no OpenAI policy URLs", () => {
   const manifest = JSON.parse(fs.readFileSync(".codex-plugin/plugin.json", "utf8"));
 
-  assert.equal(manifest.homepage, "https://github.com/OhOkThisIsFine/llm-worker-tools");
-  assert.equal(manifest.repository, "https://github.com/OhOkThisIsFine/llm-worker-tools");
-  assert.equal(manifest.interface.websiteURL, "https://github.com/OhOkThisIsFine/llm-worker-tools");
+  // The repository URL is the single source of truth; homepage and the
+  // interface website must agree with it rather than repeat a hand-typed literal.
+  const repoUrl = manifest.repository;
+  assert.match(repoUrl, /^https:\/\/github\.com\/[^/]+\/llm-worker-tools$/);
+  assert.ok(!/openai/i.test(repoUrl), "repository URL is project-owned, not OpenAI");
+  assert.equal(manifest.homepage, repoUrl);
+  assert.equal(manifest.interface.websiteURL, repoUrl);
   assert.equal("privacyPolicyURL" in manifest.interface, false);
   assert.equal("termsOfServiceURL" in manifest.interface, false);
 });
@@ -16,8 +24,14 @@ test("VS Code MCP config does not force empty env placeholder", () => {
   const config = JSON.parse(fs.readFileSync(".vscode/mcp.json", "utf8"));
   const server = config.servers["llm-worker-tools"];
 
+  // Derive the expected npx args from the published package name and the "mcp"
+  // command token registered in command-metadata, rather than duplicating the
+  // literal arg list inline where it can drift from the real entrypoint.
+  assert.ok(SCRIPT_BY_COMMAND.has("mcp"), "mcp is a registered command");
+  const expectedArgs = ["--yes", packageName, "mcp"];
+
   assert.equal(server.command, "npx");
-  assert.deepEqual(server.args, ["--yes", "llm-worker-tools", "mcp"]);
+  assert.deepEqual(server.args, expectedArgs);
   assert.equal(server.env?.LLM_WORKER_ENV_PATH, undefined);
 });
 

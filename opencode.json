@@ -43,12 +43,12 @@
       "*audit-code.mjs* validate*": "allow",
       "*audit-code.mjs": "allow",
       "*audit-code.mjs* worker-run*": "allow",
-      "*node* *auditor-lambda*dist*index.js* worker-run*": "allow",
       "git status*": "allow",
       "git diff*": "allow",
       "grep *": "allow",
       "Select-String *": "allow",
-      "rm *": "deny"
+      "rm *": "deny",
+      "*node* *auditor-lambda*dist*index.js* worker-run*": "allow"
     }
   },
   "agent": {
@@ -95,12 +95,12 @@
           "*audit-code.mjs* validate*": "allow",
           "*audit-code.mjs": "allow",
           "*audit-code.mjs* worker-run*": "allow",
-          "*node* *auditor-lambda*dist*index.js* worker-run*": "allow",
           "git status*": "allow",
           "git diff*": "allow",
           "grep *": "allow",
           "Select-String *": "allow",
-          "rm *": "deny"
+          "rm *": "deny",
+          "*node* *auditor-lambda*dist*index.js* worker-run*": "allow"
         },
         "auditor_*": "allow",
         "question": "allow",

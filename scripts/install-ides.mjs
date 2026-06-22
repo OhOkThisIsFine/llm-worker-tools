@@ -10,6 +10,7 @@ import { spawnSync } from "node:child_process";
 import { defaultConfigDir, defaultEnvPath, formatEnv, loadUserEnv } from "./env-utils.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const { version: pkgVersion } = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
 const dryRun = process.argv.includes("--dry-run");
 const nonInteractive = process.argv.includes("--yes") || process.argv.includes("-y");
 const useLocalPaths = process.argv.includes("--use-local-paths");
@@ -89,7 +90,7 @@ function cliCommand() {
   }
   return {
     command: "npx",
-    args: ["--yes", "llm-worker-tools"],
+    args: ["--yes", `llm-worker-tools@${pkgVersion}`],
   };
 }
 
@@ -196,14 +197,30 @@ function installClaudeDesktop() {
     "# LLM Worker Tools",
     "Use LLM Worker Tools as an ambient coding helper. Prefer the `llm-worker-tools` MCP tools for bulky code context reduction, and verify all worker output against source before acting.",
   ].join("\n");
-  if (!existing.includes("LLM Worker Tools")) {
-    const trimmedExisting = existing.trim();
-    writeText(instructionPath, trimmedExisting ? `${trimmedExisting}\n\n${section}` : section);
-    return dryRun ? "would modify" : "modified";
-  } else {
-    log(`Claude instructions already mention LLM Worker Tools at ${instructionPath}`);
+
+  const delimiterStart = "<!-- BEGIN LLM Worker Tools (claude desktop) -->";
+  const delimiterEnd = "<!-- END LLM Worker Tools (claude desktop) -->";
+  const managedBlock = `${delimiterStart}\n${section}\n${delimiterEnd}`;
+
+  // Strip any existing managed block.
+  let cleaned = existing.replace(
+    new RegExp(`\\n?${delimiterStart}[\\s\\S]*?${delimiterEnd}\\n?`, "m"),
+    "\n"
+  );
+  // On upgrade, absorb a legacy bare (undelimited) section so we converge to one block.
+  cleaned = cleaned.replace(
+    /\n?^# LLM Worker Tools\n[^\n]*\n?/m,
+    "\n"
+  );
+  cleaned = cleaned.trim();
+
+  const next = cleaned ? `${cleaned}\n\n${managedBlock}` : managedBlock;
+  if (`${next.trim()}\n` === existing) {
+    log(`Claude instructions already current at ${instructionPath}`);
     return "already up-to-date";
   }
+  writeText(instructionPath, next);
+  return dryRun ? "would modify" : "modified";
 }
 
 function installVSCode() {

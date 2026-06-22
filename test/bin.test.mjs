@@ -2,6 +2,14 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
 import { dispatch } from "../bin/llm-worker-tools.mjs";
+import { usageText } from "../scripts/command-metadata.mjs";
+
+// Source the banner's "read" line straight from the metadata rather than a
+// duplicated literal, so a wording change in one place can't silently drift the
+// drift-guard out from under this assertion.
+const READ_USAGE_LINE = usageText()
+  .split("\n")
+  .find(line => /\bread\b/.test(line));
 
 function fakeSpawn(calls, child = new EventEmitter()) {
   return (...args) => {
@@ -24,7 +32,8 @@ test("bin dispatch shows usage for help without spawning", () => {
 
   assert.equal(calls.length, 0);
   assert.deepEqual(exits, [0]);
-  assert.match(stdout.join("\n"), /llm-worker-tools read/);
+  assert.ok(READ_USAGE_LINE, "usageText exposes a read line");
+  assert.ok(stdout.join("\n").includes(READ_USAGE_LINE), "banner contains the metadata read line");
 });
 
 test("bin dispatch rejects unknown commands without spawning", () => {

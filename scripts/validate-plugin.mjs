@@ -63,6 +63,23 @@ for (const command of ["install", "setup", "mcp", "read", "write", "models"]) {
   }
 }
 
+const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+if (String(manifest.version) !== String(pkg.version)) {
+  fail(`plugin.json version (${manifest.version}) must match package.json version (${pkg.version}).`);
+}
+
+const opencode = JSON.parse(fs.readFileSync(path.join(root, "opencode.json"), "utf8"));
+const sharedKeys = ["read", "glob", "grep", "external_directory", "edit", "bash"];
+const topShared = {};
+const auditorShared = {};
+for (const key of sharedKeys) {
+  topShared[key] = opencode?.permission?.[key];
+  auditorShared[key] = opencode?.agent?.auditor?.permission?.[key];
+}
+if (JSON.stringify(topShared) !== JSON.stringify(auditorShared)) {
+  fail("opencode.json shared audit-code permission rules diverge between permission and agent.auditor.permission.");
+}
+
 for (const field of ["homepage", "repository"]) {
   if (manifest[field] === "https://github.com/") {
     fail(`plugin.json ${field} must not be the bare GitHub root placeholder.`);

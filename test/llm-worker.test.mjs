@@ -160,6 +160,35 @@ test("runWorker retries one timeout before succeeding", async () => {
   assert.equal(JSON.parse(output).summary, "retry ok");
 });
 
+test("runWorker dies after the single timeout retry is exhausted", async () => {
+  let calls = 0;
+  const client = {
+    chat: {
+      completions: {
+        create: async () => {
+          calls += 1;
+          throw abortError();
+        },
+      },
+    },
+  };
+
+  await assert.rejects(
+    () => runWorker("read", {
+      modelOverride: "chosen",
+      input: "source",
+      client,
+      sleepFn: async () => {},
+      logger: () => {},
+      config: createConfig({ LLM_BACKEND_BASE_URL: "http://backend", LLM_WORKER_TIMEOUT_RETRY_BACKOFF_MS: "1" }),
+    }),
+    /Timed out after .* while running read with model "chosen"\./,
+  );
+
+  // Initial attempt + exactly one retry, then the terminal die().
+  assert.equal(calls, 2);
+});
+
 test("runWorker rotates cached model on structured 404", async () => {
   const cachePath = tmpCachePath();
   writeCache({

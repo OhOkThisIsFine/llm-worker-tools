@@ -1,6 +1,6 @@
 {
   "name": "llm-worker-tools",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Codex plugin wrapper for a backend-neutral LLM worker CLI. Codex should use it proactively when normal code work involves large files, broad context reduction, multi-file summarization, or repetitive scaffolding that benefits from an advisory worker model.",
   "author": {
     "name": "Ethan"

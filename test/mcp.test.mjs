@@ -1,9 +1,59 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import http from "node:http";
 import { createRequire } from "node:module";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { callTool, handleMessage, MAX_FRAME_BYTES, parseMessages, pushInputChunk, resetParserState } from "../scripts/llm-worker-mcp.mjs";
 
 const { version } = createRequire(import.meta.url)("../package.json");
+
+const VALID_READ_JSON = JSON.stringify({
+  summary: "mcp summary",
+  findings: ["finding"],
+  open_questions: [],
+});
+
+// Local OpenAI-compatible backend so callTool's internally-built client resolves
+// against deterministic responses instead of a real network endpoint.
+function startBackend() {
+  const server = http.createServer((req, res) => {
+    const sendJson = (status, body) => {
+      const payload = JSON.stringify(body);
+      res.writeHead(status, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) });
+      res.end(payload);
+    };
+    if (req.method === "GET" && req.url === "/v1/models") {
+      sendJson(200, { object: "list", data: [{ id: "model-x", object: "model" }] });
+      return;
+    }
+    if (req.method === "POST" && req.url === "/v1/chat/completions") {
+      let body = "";
+      req.on("data", chunk => { body += chunk; });
+      req.on("end", () => {
+        let parsed;
+        try { parsed = JSON.parse(body); } catch { parsed = {}; }
+        // First chat call during model selection asks for a model id; return one
+        // from the list. The worker call returns the read-schema JSON.
+        const isSelection = /best LLM|select/i.test(JSON.stringify(parsed.messages || ""));
+        const content = isSelection ? "model-x" : VALID_READ_JSON;
+        sendJson(200, {
+          id: "chatcmpl-test",
+          object: "chat.completion",
+          model: parsed.model || "model-x",
+          choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
+        });
+      });
+      return;
+    }
+    res.writeHead(404);
+    res.end("not found");
+  });
+  return new Promise(resolve => {
+    server.listen(0, "127.0.0.1", () => resolve({ server, port: server.address().port }));
+  });
+}
 
 function framed(message) {
   const json = JSON.stringify(message);
@@ -57,6 +107,56 @@ test("MCP tools/list returns worker tools", async () => {
 test("MCP callTool validates blank input before worker execution", async () => {
   await assert.rejects(() => callTool("llm_worker_read", { input: "   " }), /non-empty string/);
   await assert.rejects(() => callTool("unknown", {}), /Unknown tool: unknown/);
+});
+
+test("MCP callTool runs llm_worker_read against the backend and returns worker output", async () => {
+  const { server, port } = await startBackend();
+  const baseUrl = `http://127.0.0.1:${port}/v1`;
+  const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), "llm-worker-mcp-"));
+  const prev = {
+    base: process.env.LLM_BACKEND_BASE_URL,
+    key: process.env.LLM_BACKEND_API_KEY,
+    cache: process.env.LLM_MODEL_CACHE_PATH,
+  };
+  process.env.LLM_BACKEND_BASE_URL = baseUrl;
+  process.env.LLM_BACKEND_API_KEY = "test-key";
+  process.env.LLM_MODEL_CACHE_PATH = path.join(cacheDir, "models.json");
+
+  try {
+    const result = await callTool("llm_worker_read", { input: "analyze this", model: "model-x" });
+    assert.equal(typeof result.output, "string");
+    assert.equal(JSON.parse(result.output).summary, "mcp summary");
+  } finally {
+    server.close();
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+    for (const [k, v] of [["LLM_BACKEND_BASE_URL", prev.base], ["LLM_BACKEND_API_KEY", prev.key], ["LLM_MODEL_CACHE_PATH", prev.cache]]) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+});
+
+test("MCP callTool rejects input above the maximum byte ceiling", async () => {
+  // Derive the cap from the rejection message rather than hardcoding a literal,
+  // so the test tracks the source constant if it ever moves.
+  let capBytes;
+  try {
+    // 8 MiB is comfortably over any sane MAX_INPUT_BYTES; we only need the throw.
+    await callTool("llm_worker_read", { input: "x".repeat(8 * 1024 * 1024) });
+    assert.fail("expected oversize input to reject");
+  } catch (error) {
+    const match = /maximum allowed size of (\d+) bytes/.exec(error.message);
+    assert.ok(match, `rejection message should expose the byte cap, got: ${error.message}`);
+    capBytes = Number(match[1]);
+  }
+  assert.ok(Number.isSafeInteger(capBytes) && capBytes > 0, "derived cap is a positive integer");
+
+  // A payload exactly one byte over the derived cap must still reject; one byte
+  // under must not trip the size guard (it fails later, not on the size check).
+  await assert.rejects(
+    () => callTool("llm_worker_read", { input: "y".repeat(capBytes + 1) }),
+    /maximum allowed size/,
+  );
 });
 
 test("MCP parser handles fragmented and concatenated frames", () => {
