@@ -48,6 +48,58 @@ Rules:
 const TEMPS = { read: 0, write: 0.2 };
 const MAX_TOKENS = { read: 4096, write: 8192 };
 
+// Deterministic, documented fallback rule (INV-WC-DETFALLBACK / COR-ffcd10d5).
+// When the LLM bootstrap returns an id NOT in the candidate set, we must still
+// pick a CODE-CAPABLE candidate deterministically — never silently return the
+// bootstrap, and never a Date/random/order-dependent pick.
+//
+// Rule (pinned, evaluated in order against a STABLE lexicographic sort of the
+// candidate set):
+//   1. Drop ids matching DETERMINISTIC_FALLBACK_AVOID (embedding/vision/etc.)
+//      to form the "eligible" set; if every id is avoided, eligible = all ids.
+//   2. Walk DETERMINISTIC_FALLBACK_PREFER in order; return the first eligible id
+//      matching the current pattern (eligible already sorted, so ties are
+//      resolved lexicographically — stable across identical inputs).
+//   3. If no preference pattern matches any eligible id, return the first
+//      eligible id in sorted order.
+// This guarantees gpt-code-xl over ada-embedding-001 for CE-001's reproduction.
+const DETERMINISTIC_FALLBACK_AVOID = [
+  /embed/i,
+  /vision/i,
+  /\bclip\b/i,
+  /rerank/i,
+  /whisper/i,
+  /tts/i,
+  /audio/i,
+  /image/i,
+  /moderation/i,
+];
+
+const DETERMINISTIC_FALLBACK_PREFER = [
+  /cod(?:e|er|estral)/i,
+  /instruct/i,
+  /chat/i,
+  /\bgpt\b|gpt-/i,
+  /llama/i,
+  /qwen/i,
+  /mistral|mixtral/i,
+];
+
+export function deterministicFallbackModel(models) {
+  const sorted = [...models].sort();
+  if (sorted.length === 0) return undefined;
+
+  const eligible = sorted.filter(id => !DETERMINISTIC_FALLBACK_AVOID.some(rx => rx.test(id)));
+  const pool = eligible.length > 0 ? eligible : sorted;
+
+  for (const rx of DETERMINISTIC_FALLBACK_PREFER) {
+    const match = pool.find(id => rx.test(id));
+    if (match) return match;
+  }
+
+  return pool[0];
+}
+
 const MODEL_SELECTION_PROMPT = `You are selecting the best LLM for code analysis and generation tasks.
 
 Given the following available model IDs, pick the single strongest general-purpose model for code understanding, summarization, and generation.
@@ -207,8 +259,11 @@ export async function selectBestModel(client, models, signal, logger = console.e
     const selected = raw.trim().replace(/^["'`]+|["'`]+$/g, "").trim();
     if (models.includes(selected)) return selected;
 
-    logger(`Warning: LLM selected "${selected}" not in list. Using "${bootstrap}". Raw selection response: ${JSON.stringify(raw)}.`);
-    return bootstrap;
+    // Out-of-list id: fall back to a DETERMINISTIC code-capable pick from the
+    // candidate set (INV-WC-DETFALLBACK / CE-001), never the bootstrap.
+    const fallback = deterministicFallbackModel(models);
+    logger(`Warning: LLM selected "${selected}" not in list. Falling back to deterministic code-capable pick "${fallback}". Raw selection response: ${JSON.stringify(raw)}.`);
+    return fallback;
   }
 
   die("No models responded to the selection prompt. Check your API key and account access.");
