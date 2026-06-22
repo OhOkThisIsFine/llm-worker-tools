@@ -13,6 +13,13 @@ const { version } = createRequire(import.meta.url)("../package.json");
 const CR = 13;
 const LF = 10;
 const MAX_INPUT_BYTES = 1_048_576;
+// Bounded framing overhead allowed on top of the advertised input ceiling so the
+// transport cap never silently shrinks MAX_INPUT_BYTES. Covers the JSON-RPC
+// envelope (jsonrpc/id/method/params wrapping) plus the Content-Length header.
+const MAX_FRAMING_OVERHEAD_BYTES = 64 * 1024;
+// Hard cap on a single frame's advertised Content-Length / buffered bytes,
+// enforced at the byte boundary before any Buffer.alloc or decode.
+export const MAX_FRAME_BYTES = MAX_INPUT_BYTES + MAX_FRAMING_OVERHEAD_BYTES;
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 export const tools = [
@@ -119,16 +126,33 @@ export function pushInputChunk(chunk) {
 export function parseMessages({ stdout = process.stdout } = {}) {
   for (;;) {
     const headerEnd = findHeaderEnd();
-    if (headerEnd === -1) return;
+    if (headerEnd === -1) {
+      // No complete header yet. Guard against a never-terminating header that
+      // would otherwise let an attacker buffer unbounded bytes: once the
+      // un-terminated header alone exceeds the frame cap, it can never become a
+      // valid frame, so flush it.
+      if (inputBytes > MAX_FRAME_BYTES) resetParserState();
+      return;
+    }
 
     const header = readBytes(headerEnd).toString("utf8");
     const lengthMatch = /^Content-Length:\s*(\d+)$/im.exec(header);
     if (!lengthMatch) {
-      resetParserState();
-      return;
+      // Resync past only this malformed header's terminator so valid frames
+      // queued behind it are still parsed, rather than flushing the whole buffer.
+      consumeBytes(headerEnd + 4);
+      continue;
     }
 
     const length = Number(lengthMatch[1]);
+    // Enforce the byte cap on the advertised Content-Length BEFORE allocating or
+    // decoding any payload. A frame larger than the cap can never be served, so
+    // skip past its header terminator and resync on whatever follows.
+    if (!Number.isSafeInteger(length) || length > MAX_FRAME_BYTES) {
+      consumeBytes(headerEnd + 4);
+      continue;
+    }
+
     const frameLength = headerEnd + 4 + length;
     if (inputBytes < frameLength) return;
 
