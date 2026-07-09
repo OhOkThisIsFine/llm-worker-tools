@@ -6,7 +6,10 @@ import test from "node:test";
 import {
   cacheIsFresh,
   createConfig,
+  extractJsonPayload,
+  findJsonSpans,
   is404,
+  isJsonModeRejected,
   parseArgs,
   parseWorkerJson,
   readInput,
@@ -43,6 +46,54 @@ test("parseWorkerJson validates read and write schemas", () => {
   assert.throws(() => parseWorkerJson("{", "read"), /invalid JSON/);
   assert.throws(() => parseWorkerJson("{\"summary\":\"ok\",\"findings\":[1],\"open_questions\":[]}", "read"), /read schema/);
   assert.throws(() => parseWorkerJson("{\"files\":[{\"path\":\"a.txt\"}],\"notes\":[]}", "write"), /write schema/);
+});
+
+test("parseWorkerJson tolerates reasoning prose before/after the JSON object", () => {
+  const reasoning = "Let me analyze this diff carefully.\n\n" +
+    "First I'll look at the changes, then summarize.\n\n" +
+    "{\"summary\":\"ok\",\"findings\":[\"a\",\"b\"],\"open_questions\":[]}\n\n" +
+    "Hope this helps!";
+  const output = parseWorkerJson(reasoning, "read");
+  assert.deepEqual(JSON.parse(output), { summary: "ok", findings: ["a", "b"], open_questions: [] });
+});
+
+test("parseWorkerJson tolerates a fenced JSON block preceded by prose", () => {
+  const reasoning = "Here is my analysis as JSON:\n\n```json\n" +
+    "{\"summary\":\"fenced\",\"findings\":[],\"open_questions\":[]}\n```\n\nDone.";
+  const output = parseWorkerJson(reasoning, "read");
+  assert.deepEqual(JSON.parse(output), { summary: "fenced", findings: [], open_questions: [] });
+});
+
+test("parseWorkerJson prefers the LAST balanced JSON object when multiple appear", () => {
+  const reasoning = "For example the shape looks like {\"summary\":\"example\",\"findings\":[],\"open_questions\":[]}. " +
+    "But the real answer is: {\"summary\":\"actual\",\"findings\":[],\"open_questions\":[]}";
+  const output = parseWorkerJson(reasoning, "read");
+  assert.deepEqual(JSON.parse(output), { summary: "actual", findings: [], open_questions: [] });
+});
+
+test("parseWorkerJson still dies when no candidate span parses or validates", () => {
+  assert.throws(() => parseWorkerJson("Let me think about this. No JSON here.", "read"), /invalid JSON/);
+});
+
+test("findJsonSpans ignores braces embedded inside string literals", () => {
+  const text = "prose { not json \"a { b }\" } trailing {\"summary\":\"real\",\"findings\":[],\"open_questions\":[]}";
+  const spans = findJsonSpans(text);
+  const last = spans[spans.length - 1];
+  assert.deepEqual(JSON.parse(text.slice(...last)), { summary: "real", findings: [], open_questions: [] });
+});
+
+test("extractJsonPayload returns the strict-parse error when nothing salvages", () => {
+  const result = extractJsonPayload("{");
+  assert.equal("error" in result, true);
+  assert.match(result.error.message, /JSON/i);
+});
+
+test("isJsonModeRejected matches 400/422 but not 404", () => {
+  assert.equal(isJsonModeRejected({ status: 400 }), true);
+  assert.equal(isJsonModeRejected({ status: 422 }), true);
+  assert.equal(isJsonModeRejected({ status: 404 }), false);
+  assert.equal(isJsonModeRejected({ response: { status: 400 } }), true);
+  assert.equal(isJsonModeRejected({}), false);
 });
 
 test("cache helpers read, write, and validate freshness", () => {
@@ -187,6 +238,91 @@ test("runWorker dies after the single timeout retry is exhausted", async () => {
 
   // Initial attempt + exactly one retry, then the terminal die().
   assert.equal(calls, 2);
+});
+
+test("runWorker requests response_format json_object and falls back if the backend 4xxs on it", async () => {
+  const calls = [];
+  const client = {
+    chat: {
+      completions: {
+        create: async body => {
+          calls.push(body);
+          if (body.response_format) {
+            const error = new Error("Unrecognized request argument: response_format");
+            error.status = 400;
+            throw error;
+          }
+          return { choices: [{ message: { content: "{\"summary\":\"no json mode\",\"findings\":[],\"open_questions\":[]}" } }] };
+        },
+      },
+    },
+  };
+
+  const output = await runWorker("read", {
+    modelOverride: "chosen",
+    input: "source",
+    client,
+    logger: () => {},
+    config: createConfig({ LLM_BACKEND_BASE_URL: "http://backend" }),
+  });
+
+  assert.equal(JSON.parse(output).summary, "no json mode");
+  assert.equal(calls.length, 2);
+  assert.deepEqual(calls[0].response_format, { type: "json_object" });
+  assert.equal(calls[1].response_format, undefined);
+});
+
+test("runWorker retries once with a stricter nudge when the backend emits reasoning prose instead of JSON", async () => {
+  const seenSystemPrompts = [];
+  let calls = 0;
+  const client = {
+    chat: {
+      completions: {
+        create: async body => {
+          calls += 1;
+          seenSystemPrompts.push(body.messages[0].content);
+          if (calls === 1) {
+            return { choices: [{ message: { content: "Let me think step by step about this diff before answering." } }] };
+          }
+          return { choices: [{ message: { content: "{\"summary\":\"nudged\",\"findings\":[],\"open_questions\":[]}" } }] };
+        },
+      },
+    },
+  };
+
+  const output = await runWorker("read", {
+    modelOverride: "chosen",
+    input: "source",
+    client,
+    logger: () => {},
+    config: createConfig({ LLM_BACKEND_BASE_URL: "http://backend" }),
+  });
+
+  assert.equal(calls, 2);
+  assert.equal(JSON.parse(output).summary, "nudged");
+  assert.doesNotMatch(seenSystemPrompts[0], /CRITICAL/);
+  assert.match(seenSystemPrompts[1], /CRITICAL/);
+});
+
+test("runWorker dies with the standard invalid-JSON error if the retried nudge also fails", async () => {
+  const client = {
+    chat: {
+      completions: {
+        create: async () => ({ choices: [{ message: { content: "Still just reasoning prose, no JSON at all." } }] }),
+      },
+    },
+  };
+
+  await assert.rejects(
+    () => runWorker("read", {
+      modelOverride: "chosen",
+      input: "source",
+      client,
+      logger: () => {},
+      config: createConfig({ LLM_BACKEND_BASE_URL: "http://backend" }),
+    }),
+    /Backend returned invalid JSON for read/,
+  );
 });
 
 test("runWorker rotates cached model on structured 404", async () => {

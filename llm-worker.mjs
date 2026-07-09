@@ -48,6 +48,9 @@ Rules:
 const TEMPS = { read: 0, write: 0.2 };
 const MAX_TOKENS = { read: 4096, write: 8192 };
 
+const STRICT_JSON_NUDGE = "CRITICAL: Your entire response must be ONLY the raw JSON object described above. " +
+  "No reasoning, no chain-of-thought, no commentary, no markdown fences — before or after it.";
+
 // Deterministic, documented fallback rule (INV-WC-DETFALLBACK / COR-ffcd10d5).
 // When the LLM bootstrap returns an id NOT in the candidate set, we must still
 // pick a CODE-CAPABLE candidate deterministically — never silently return the
@@ -153,8 +156,85 @@ export function isUnsupportedModel(err) {
     [400, 404, 422].includes(err?.error?.status);
 }
 
+// A model/backend that rejects the response_format param outright (as opposed
+// to 404 "model not found", which is handled separately by model rotation).
+export function isJsonModeRejected(err) {
+  const status = err?.status ?? err?.response?.status ?? err?.error?.status;
+  return status === 400 || status === 422;
+}
+
 export function stripFences(text) {
   return text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+}
+
+// Scans text for syntactically-complete top-level JSON values ({...} or [...]),
+// tracking string/escape state so braces or brackets inside string literals are
+// ignored. Used as a tolerant fallback when a backend prefixes/suffixes the JSON
+// payload with reasoning prose, markdown fences, or trailing commentary.
+export function findJsonSpans(text) {
+  const spans = [];
+  const stack = [];
+  let start = -1;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+
+    if (inString) {
+      if (escapeNext) escapeNext = false;
+      else if (ch === "\\") escapeNext = true;
+      else if (ch === "\"") inString = false;
+      continue;
+    }
+
+    if (ch === "\"") { inString = true; continue; }
+
+    if (ch === "{" || ch === "[") {
+      if (stack.length === 0) start = i;
+      stack.push(ch === "{" ? "}" : "]");
+      continue;
+    }
+
+    if (ch === "}" || ch === "]") {
+      if (stack.length === 0) continue; // stray closer outside any candidate
+      const expected = stack.pop();
+      if (expected !== ch) {
+        // Mismatched bracket types — abandon this candidate and keep scanning.
+        stack.length = 0;
+        start = -1;
+        continue;
+      }
+      if (stack.length === 0 && start !== -1) {
+        spans.push([start, i + 1]);
+        start = -1;
+      }
+    }
+  }
+
+  return spans;
+}
+
+// Tolerant JSON extraction: try a strict parse first (byte-identical behavior
+// for already-valid responses), then fall back to the LAST balanced top-level
+// JSON value found anywhere in the text — handles leading reasoning prose
+// ("Let me analyze..."), ```json fences, and trailing commentary emitted by
+// reasoning-style models instead of a bare JSON object.
+export function extractJsonPayload(text) {
+  try {
+    return { value: JSON.parse(stripFences(text)) };
+  } catch (firstErr) {
+    const spans = findJsonSpans(text);
+    for (let i = spans.length - 1; i >= 0; i--) {
+      const [start, end] = spans[i];
+      try {
+        return { value: JSON.parse(text.slice(start, end)) };
+      } catch {
+        // Not valid JSON on its own; try the next-most-recent candidate span.
+      }
+    }
+    return { error: firstErr };
+  }
 }
 
 export function readInput(inputPath, { config = createConfig(), stdin = process.stdin, fsModule = fs } = {}) {
@@ -183,12 +263,11 @@ export function setsEqual(a, b) {
 }
 
 export function parseWorkerJson(text, verb) {
-  let parsed;
-  try {
-    parsed = JSON.parse(stripFences(text));
-  } catch (err) {
-    die(`Backend returned invalid JSON for ${verb}: ${err.message}`);
+  const extracted = extractJsonPayload(text);
+  if (!("value" in extracted)) {
+    die(`Backend returned invalid JSON for ${verb}: ${extracted.error.message}`);
   }
+  const parsed = extracted.value;
 
   if (verb === "read") {
     const valid = parsed &&
@@ -397,26 +476,70 @@ export async function runWorker(verb, {
   const tried = new Set();
   let timedOutOnce = false;
   let activeTimeoutMs = timeoutMs;
+  let jsonModeSupported = true;
 
   for (;;) {
     try {
       return await withTimeout(activeTimeoutMs, async signal => {
+        const buildBody = messages => ({
+          model,
+          temperature: TEMPS[verb],
+          max_tokens: MAX_TOKENS[verb],
+          messages,
+        });
+
+        // Belt: request strict JSON mode when the backend accepts it. Some
+        // OpenAI-compatible backends 4xx on an unrecognized response_format —
+        // fall back to a plain request rather than failing the whole call.
+        const createCompletion = async messages => {
+          if (jsonModeSupported) {
+            try {
+              return await activeClient.chat.completions.create(
+                { ...buildBody(messages), response_format: { type: "json_object" } },
+                { signal },
+              );
+            } catch (err) {
+              if (!isJsonModeRejected(err)) throw err;
+              jsonModeSupported = false;
+              logger(`Model "${model}" rejected response_format; retrying without it...`);
+            }
+          }
+          return activeClient.chat.completions.create(buildBody(messages), { signal });
+        };
+
+        let jsonRetried = false;
+
         for (;;) {
           tried.add(model);
           try {
-            const response = await activeClient.chat.completions.create({
-              model,
-              temperature: TEMPS[verb],
-              max_tokens: MAX_TOKENS[verb],
-              messages: [
-                { role: "system", content: SYSTEM[verb] },
-                { role: "user", content: workerInput },
-              ],
-            }, { signal });
+            const response = await createCompletion([
+              { role: "system", content: SYSTEM[verb] },
+              { role: "user", content: workerInput },
+            ]);
 
             const content = response.choices?.[0]?.message?.content;
             if (!content) die("Backend returned no content.");
-            return parseWorkerJson(content, verb);
+
+            // Suspenders: reasoning-style models sometimes emit chain-of-thought
+            // prose instead of bare JSON despite the system prompt and
+            // response_format. parseWorkerJson already tolerates wrapped/prefixed
+            // JSON; if extraction still fails outright, retry the request once
+            // with a sterner nudge before giving up.
+            try {
+              return parseWorkerJson(content, verb);
+            } catch (parseErr) {
+              if (jsonRetried) throw parseErr;
+              jsonRetried = true;
+              logger(`Backend response for ${verb} was not valid JSON; retrying once with a stricter format nudge...`);
+
+              const retryResponse = await createCompletion([
+                { role: "system", content: `${SYSTEM[verb]}\n\n${STRICT_JSON_NUDGE}` },
+                { role: "user", content: workerInput },
+              ]);
+              const retryContent = retryResponse.choices?.[0]?.message?.content;
+              if (!retryContent) throw parseErr;
+              return parseWorkerJson(retryContent, verb);
+            }
           } catch (err) {
             if (!modelOverride && is404(err)) {
               logger(`Model "${model}" returned 404.`);
