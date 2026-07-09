@@ -477,25 +477,31 @@ export async function runWorker(verb, {
   let timedOutOnce = false;
   let activeTimeoutMs = timeoutMs;
   let jsonModeSupported = true;
+  let jsonNudgeActive = false;
+  let jsonRetried = false;
 
   for (;;) {
     try {
       return await withTimeout(activeTimeoutMs, async signal => {
-        const buildBody = messages => ({
+        const systemContent = jsonNudgeActive ? `${SYSTEM[verb]}\n\n${STRICT_JSON_NUDGE}` : SYSTEM[verb];
+        const buildBody = () => ({
           model,
           temperature: TEMPS[verb],
           max_tokens: MAX_TOKENS[verb],
-          messages,
+          messages: [
+            { role: "system", content: systemContent },
+            { role: "user", content: workerInput },
+          ],
         });
 
         // Belt: request strict JSON mode when the backend accepts it. Some
         // OpenAI-compatible backends 4xx on an unrecognized response_format —
         // fall back to a plain request rather than failing the whole call.
-        const createCompletion = async messages => {
+        const createCompletion = async () => {
           if (jsonModeSupported) {
             try {
               return await activeClient.chat.completions.create(
-                { ...buildBody(messages), response_format: { type: "json_object" } },
+                { ...buildBody(), response_format: { type: "json_object" } },
                 { signal },
               );
             } catch (err) {
@@ -504,18 +510,13 @@ export async function runWorker(verb, {
               logger(`Model "${model}" rejected response_format; retrying without it...`);
             }
           }
-          return activeClient.chat.completions.create(buildBody(messages), { signal });
+          return activeClient.chat.completions.create(buildBody(), { signal });
         };
-
-        let jsonRetried = false;
 
         for (;;) {
           tried.add(model);
           try {
-            const response = await createCompletion([
-              { role: "system", content: SYSTEM[verb] },
-              { role: "user", content: workerInput },
-            ]);
+            const response = await createCompletion();
 
             const content = response.choices?.[0]?.message?.content;
             if (!content) die("Backend returned no content.");
@@ -523,22 +524,16 @@ export async function runWorker(verb, {
             // Suspenders: reasoning-style models sometimes emit chain-of-thought
             // prose instead of bare JSON despite the system prompt and
             // response_format. parseWorkerJson already tolerates wrapped/prefixed
-            // JSON; if extraction still fails outright, retry the request once
-            // with a sterner nudge before giving up.
+            // JSON; if extraction still fails outright, hand back to the outer
+            // loop for ONE retry with a sterner nudge and a FRESH timeout window
+            // (a slow first attempt must not starve the retry's budget).
             try {
               return parseWorkerJson(content, verb);
             } catch (parseErr) {
               if (jsonRetried) throw parseErr;
-              jsonRetried = true;
-              logger(`Backend response for ${verb} was not valid JSON; retrying once with a stricter format nudge...`);
-
-              const retryResponse = await createCompletion([
-                { role: "system", content: `${SYSTEM[verb]}\n\n${STRICT_JSON_NUDGE}` },
-                { role: "user", content: workerInput },
-              ]);
-              const retryContent = retryResponse.choices?.[0]?.message?.content;
-              if (!retryContent) throw parseErr;
-              return parseWorkerJson(retryContent, verb);
+              const retryRequest = new Error(`Backend response for ${verb} was not valid JSON.`);
+              retryRequest.jsonNudgeRetry = true;
+              throw retryRequest;
             }
           } catch (err) {
             if (!modelOverride && is404(err)) {
@@ -551,6 +546,12 @@ export async function runWorker(verb, {
         }
       }, { setTimeoutFn, clearTimeoutFn });
     } catch (err) {
+      if (err?.jsonNudgeRetry) {
+        jsonRetried = true;
+        jsonNudgeActive = true;
+        logger(`Backend response for ${verb} was not valid JSON; retrying once with a stricter format nudge and a fresh ${activeTimeoutMs / 1000}s timeout...`);
+        continue;
+      }
       if (!isAbortError(err)) throw err;
       if (timedOutOnce) die(timeoutMessage(activeTimeoutMs, verb, model));
       timedOutOnce = true;

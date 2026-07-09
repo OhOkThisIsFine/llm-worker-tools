@@ -304,6 +304,41 @@ test("runWorker retries once with a stricter nudge when the backend emits reason
   assert.match(seenSystemPrompts[1], /CRITICAL/);
 });
 
+test("runWorker gives the nudge retry a fresh timeout window (not starved by attempt-1 latency)", async () => {
+  // Window is 150ms; each backend call takes ~100ms. Under a SHARED window the
+  // retry would start at t=100 and be aborted at t=150 mid-flight. With a
+  // fresh window per attempt, both calls complete without any timeout.
+  const logs = [];
+  let calls = 0;
+  const client = {
+    chat: {
+      completions: {
+        create: async (body, options) => {
+          calls += 1;
+          await new Promise(resolve => setTimeout(resolve, 100));
+          if (options?.signal?.aborted) throw abortError();
+          if (calls === 1) {
+            return { choices: [{ message: { content: "Let me reason at length about this before answering." } }] };
+          }
+          return { choices: [{ message: { content: "{\"summary\":\"fresh window\",\"findings\":[],\"open_questions\":[]}" } }] };
+        },
+      },
+    },
+  };
+
+  const output = await runWorker("read", {
+    modelOverride: "chosen",
+    input: "source",
+    client,
+    logger: message => logs.push(message),
+    config: createConfig({ LLM_BACKEND_BASE_URL: "http://backend", LLM_WORKER_TIMEOUT_MS: "150" }),
+  });
+
+  assert.equal(calls, 2);
+  assert.equal(JSON.parse(output).summary, "fresh window");
+  assert.equal(logs.some(line => /Timed out/.test(line)), false);
+});
+
 test("runWorker dies with the standard invalid-JSON error if the retried nudge also fails", async () => {
   const client = {
     chat: {
